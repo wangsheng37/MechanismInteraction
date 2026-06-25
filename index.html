@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>平面四杆机构特性仿真系列</title>
+<style>
+  :root{
+    --bg:#faf9f5; --surface:#ffffff; --surface2:#f1efe8;
+    --text:#2c2c2a; --text2:#5f5e5a; --text3:#888780;
+    --border:rgba(0,0,0,0.12); --border2:rgba(0,0,0,0.22);
+    --success:#3b6d11; --danger:#a32d2d;
+    --info-bg:#e6f1fb; --warn-bg:#faeeda; --danger-bg:#fcebeb;
+    --crank:#e24b4a; --coupler:#378add; --rocker:#1d9e75; --frame:#888780;
+  }
+  @media(prefers-color-scheme:dark){
+    :root{--bg:#1f1e1b;--surface:#2a2926;--surface2:#33322e;
+      --text:#ecebe3;--text2:#b4b2a9;--text3:#888780;
+      --border:rgba(255,255,255,0.14);--border2:rgba(255,255,255,0.24);
+      --success:#97c459;--danger:#f09595;
+      --info-bg:#0c447c;--warn-bg:#633806;--danger-bg:#791f1f;}
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{margin:0;padding:0;
+    font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    background:var(--bg);color:var(--text);line-height:1.5;}
+  .app{max-width:920px;margin:0 auto;padding:16px;}
+  header{margin-bottom:12px;}
+  h1{font-size:20px;font-weight:600;margin:0 0 2px;}
+  .tagline{font-size:12px;color:var(--text2);margin:0;}
+  .tabs{display:flex;gap:6px;margin:14px 0;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px;}
+  .tab{flex:0 0 auto;padding:9px 14px;font-size:13px;border:0.5px solid var(--border2);
+    border-radius:8px;background:var(--surface);color:var(--text2);cursor:pointer;white-space:nowrap;
+    transition:all .15s;min-height:40px;}
+  .tab.active{background:#185fa5;color:#fff;border-color:#185fa5;font-weight:600;}
+  .panel{display:none;}
+  .panel.active{display:block;}
+  @media(min-width:760px){
+    .app{max-width:1100px;padding:24px;}
+    .panel.active{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:0 24px;align-items:start;grid-auto-flow:row;}
+    .panel.active>.stage-card{grid-column:1;grid-row:1/99;align-self:start;position:sticky;top:16px;margin-bottom:0;}
+    .panel.active>:not(.stage-card){grid-column:2;}
+    h1{font-size:24px;}
+  }
+  .stage-card{background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:8px;margin-bottom:12px;}
+  svg{display:block;width:100%;height:auto;touch-action:none;}
+  .readouts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:12px;}
+  .metric{background:var(--surface2);border-radius:8px;padding:9px 11px;}
+  .metric .lab{font-size:11px;color:var(--text2);margin-bottom:1px;}
+  .metric .val{font-size:18px;font-weight:600;}
+  .verdict{border-radius:8px;padding:11px 13px;margin-bottom:12px;}
+  .verdict .lab{font-size:11px;color:var(--text2);}
+  .verdict .name{font-size:18px;font-weight:600;margin-top:1px;}
+  .verdict .desc{font-size:11px;color:var(--text2);margin-top:2px;}
+  .ctrl{margin-bottom:9px;}
+  .ctrl .head{display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px;}
+  .ctrl .val{font-weight:600;font-variant-numeric:tabular-nums;}
+  input[type=range]{width:100%;height:30px;cursor:pointer;accent-color:#185fa5;margin:0;}
+  .btnrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center;}
+  button{font-family:inherit;font-size:13px;padding:9px 13px;background:var(--surface);
+    border:0.5px solid var(--border2);border-radius:8px;cursor:pointer;color:var(--text);
+    min-height:40px;transition:background .15s;}
+  button:active{transform:scale(0.97);}
+  button.primary{border-color:#185fa5;color:#185fa5;}
+  button.danger{border-color:var(--danger);color:var(--danger);}
+  .seg{font-size:12px;color:var(--text2);margin-right:2px;align-self:center;}
+  .hint{font-size:12px;color:var(--text2);margin-top:10px;line-height:1.6;}
+  .pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600;}
+  text{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;}
+</style>
+</head>
+<body>
+<div id="wx-guide" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:9999;padding:20px;text-align:right;">
+  <div style="color:#fff;font-size:15px;line-height:1.9;margin-top:8px;">
+    <div style="font-size:34px;line-height:1;">↗</div>
+    请点击右上角 <b>···</b><br>选择「在浏览器打开」<br>即可正常使用本仿真
+  </div>
+  <button onclick="document.getElementById('wx-guide').style.display='none'" style="position:absolute;left:20px;bottom:40px;background:#fff;color:#222;border:none;padding:10px 20px;border-radius:8px;font-size:14px;">仍在微信内继续（部分功能受限）</button>
+</div>
+<div class="app">
+<header>
+  <h1>平面四杆机构特性仿真系列 <span style="font-size:14px;font-weight:400;color:var(--text2);">by 王晟NUE</span></h1>
+  <p class="tagline">拖动杆长 · 实时分析 · 手机可用 · 双智驱动 图谱先行</p>
+</header>
+
+<div class="tabs">
+  <button class="tab active" data-tab="grashof">① 曲柄存在条件</button>
+  <button class="tab" data-tab="quick">② 急回特性</button>
+  <button class="tab" data-tab="trans">③ 压力角与传动角</button>
+  <button class="tab" data-tab="coupler">④ 连杆曲线</button>
+</div>
+
+<div class="panel active" id="panel-grashof"></div>
+<div class="panel" id="panel-quick"></div>
+<div class="panel" id="panel-trans"></div>
+<div class="panel" id="panel-coupler"></div>
+</div>
+
+<script>
+(function(){
+  var ua=navigator.userAgent.toLowerCase();
+  if(ua.indexOf('micromessenger')!==-1){
+    document.getElementById('wx-guide').style.display='block';
+  }
+})();
+const SVGNS='http://www.w3.org/2000/svg';
+function E(tag,a){const e=document.createElementNS(SVGNS,tag);for(const k in a)e.setAttribute(k,a[k]);return e;}
+function txt(parent,x,y,s,size,fill,anchor,weight){const t=E('text',{x,y,'font-size':size,fill,'text-anchor':anchor||'start'});if(weight)t.setAttribute('font-weight',weight);t.textContent=s;parent.appendChild(t);return t;}
+function cssv(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim();}
+
+function anchoredTransform(s, ax, ay, vw, vh){
+  const tx=vw/2-ax*s, ty=vh/2-ay*s;
+  return `translate(${tx.toFixed(2)},${ty.toFixed(2)}) scale(${s.toFixed(3)})`;
+}
+function fitScale(L, cx, cy, vw, vh, pad, extraPts){
+  let minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9;
+  const Dx=cx+L.d;
+  [[cx-15,cy],[Dx+15,cy]].forEach(([x,y])=>{minX=Math.min(minX,x);maxX=Math.max(maxX,x);minY=Math.min(minY,y);maxY=Math.max(maxY,y);});
+  for(let i=0;i<360;i+=4){const p=fourBar(L,i*Math.PI/180,cx,cy);if(!p)continue;[[p.Bx,p.By],[p.Cx,p.Cy]].forEach(([x,y])=>{minX=Math.min(minX,x);maxX=Math.max(maxX,x);minY=Math.min(minY,y);maxY=Math.max(maxY,y);});}
+  if(extraPts)extraPts.forEach(p=>{if(!p)return;minX=Math.min(minX,p.x);maxX=Math.max(maxX,p.x);minY=Math.min(minY,p.y);maxY=Math.max(maxY,p.y);});
+  const w=Math.max(maxX-minX,1), h=Math.max(maxY-minY,1);
+  const halfV=Math.max(maxY-cy,cy-minY);
+  const sV=(vh/2-pad)/Math.max(halfV,1);
+  const s=Math.min((vw-2*pad)/w, sV, 1.0);
+  return {s, ax:cx+L.d/2, ay:cy, cax:(minX+maxX)/2, cay:(minY+maxY)/2};
+}
+
+const TABS=['grashof','quick','trans','coupler'];
+let activeTab='grashof';
+document.querySelectorAll('.tab').forEach(b=>{
+  b.addEventListener('click',()=>{
+    activeTab=b.dataset.tab;
+    document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t===b));
+    TABS.forEach(t=>document.getElementById('panel-'+t).classList.toggle('active',t===activeTab));
+    if(MOD[activeTab]&&MOD[activeTab].onShow)MOD[activeTab].onShow();
+  });
+});
+
+const MOD={};
+
+function fourBar(L, th, cx, cy, branch){
+  const Ax=cx, Ay=cy, Dx=cx+L.d, Dy=cy;
+  const Bx=Ax+L.a*Math.cos(th), By=Ay-L.a*Math.sin(th);
+  const dx=Dx-Bx, dy=Dy-By, dist=Math.hypot(dx,dy);
+  if(dist>L.b+L.c||dist<Math.abs(L.b-L.c))return null;
+  const aa=(L.b*L.b-L.c*L.c+dist*dist)/(2*dist);
+  const h2=L.b*L.b-aa*aa;
+  if(h2<0)return null;
+  const h=Math.sqrt(h2);
+  const px=Bx+aa*dx/dist, py=By+aa*dy/dist;
+  const s=branch===undefined?1:branch;
+  return {Ax,Ay,Bx,By,Cx:px-s*h*dy/dist,Cy:py+s*h*dx/dist,Dx,Dy,h2,dist};
+}
+function grashofInfo(L){
+  const v=[L.a,L.b,L.c,L.d];
+  const min=Math.min(...v), max=Math.max(...v), sum=v.reduce((s,x)=>s+x,0);
+  return {min,max,sum,grashof:(min+max)<=(sum-min-max),shortIdx:v.indexOf(min),slSum:min+max,pqSum:sum-min-max};
+}
+function rangeOf(L,cx,cy){
+  let valid=[];
+  for(let i=0;i<=360;i++){if(fourBar(L,i*Math.PI/180,cx,cy))valid.push(i);}
+  const fullRot=valid.length>=359;
+  if(fullRot)return {fullRot:true,lo:0,hi:2*Math.PI};
+  if(!valid.length)return {fullRot:false,lo:0,hi:0};
+  let gaps=[],start=valid[0],prev=valid[0];
+  for(let k=1;k<valid.length;k++){if(valid[k]-prev>1){gaps.push([start,prev]);start=valid[k];}prev=valid[k];}
+  gaps.push([start,prev]);
+  let best=gaps.reduce((b,g)=>(g[1]-g[0])>(b[1]-b[0])?g:b,gaps[0]);
+  return {fullRot:false,lo:best[0]*Math.PI/180,hi:best[1]*Math.PI/180};
+}
+function transAngle(p){
+  const v1x=p.Cx-p.Bx, v1y=p.Cy-p.By;
+  const v2x=p.Dx-p.Cx, v2y=p.Dy-p.Cy;
+  let a=Math.acos((v1x*v2x+v1y*v2y)/(Math.hypot(v1x,v1y)*Math.hypot(v2x,v2y)))*180/Math.PI;
+  return a>90?180-a:a;
+}
+
+(function(){
+  const P=document.getElementById('panel-grashof');
+  P.innerHTML=`
+  <div class="stage-card"><svg id="g-svg" viewBox="0 0 360 280" role="img"><title>四杆机构运动仿真</title></svg></div>
+  <div class="verdict" id="g-verdict">
+    <div class="lab">机构类型</div>
+    <div class="name" id="g-name">曲柄摇杆机构</div>
+    <div class="desc" id="g-desc">满足杆长条件，最短杆为连架杆</div>
+  </div>
+  <div class="readouts">
+    <div class="metric"><div class="lab">最短杆 + 最长杆</div><div class="val" id="g-sl">—</div></div>
+    <div class="metric"><div class="lab">其余两杆之和</div><div class="val" id="g-pq">—</div></div>
+  </div>
+  <div id="g-cond" style="border-radius:8px;padding:9px 12px;margin-bottom:12px;font-size:13px;font-weight:600;">—</div>
+  <div class="ctrl" data-k="a"><div class="head"><span><b style="color:var(--crank)">杆AB</b> 连架</span><span class="val">—</span></div><input type="range" min="10" max="100" step="1" value="30"></div>
+  <div class="ctrl" data-k="b"><div class="head"><span><b style="color:var(--coupler)">杆BC</b> 连杆</span><span class="val">—</span></div><input type="range" min="10" max="100" step="1" value="75"></div>
+  <div class="ctrl" data-k="c"><div class="head"><span><b style="color:var(--rocker)">杆CD</b> 连架</span><span class="val">—</span></div><input type="range" min="10" max="100" step="1" value="60"></div>
+  <div class="ctrl" data-k="d"><div class="head"><span><b style="color:var(--frame)">杆DA</b> 机架</span><span class="val">—</span></div><input type="range" min="10" max="100" step="1" value="80"></div>
+  <div class="btnrow">
+    <button id="g-play" class="primary">⏸ 暂停</button>
+    <span class="seg">预设</span>
+    <button class="g-preset" data-p="30,75,60,80">曲柄摇杆</button>
+    <button class="g-preset" data-p="70,75,60,30">双曲柄</button>
+    <button class="g-preset" data-p="60,30,75,80">双摇杆</button>
+    <button class="g-preset" data-p="25,90,30,45">不满足</button>
+    <button id="g-dead" class="danger">⊙ 奇异位形</button>
+  </div>
+  <p class="hint">拖动滑块或画面中 B、C 铰点改变杆长。A、D 为固定铰。点「奇异位形」看机构经过死点时减速、连杆与曲柄共线（传动角=0）。</p>`;
+
+  const svg=document.getElementById('g-svg');
+  const cx=90, cy=150;
+  let L={a:30,b:75,c:60,d:80};
+  let theta=0, playing=true, dir=1, dragging=null, deadMode=false, deadHold=0;
+  let rng={fullRot:true,lo:0,hi:2*Math.PI};
+  let view={s:1,ax:180,ay:140};
+
+  function rebuild(){ rng=rangeOf(L,cx,cy); if(!rng.fullRot){ if(theta<rng.lo)theta=rng.lo; if(theta>rng.hi)theta=rng.hi; } view=fitScale(L,cx,cy,360,280,24); }
+  function classify(){
+    const g=grashofInfo(L);
+    let name,desc,key;
+    if(!g.grashof){name='双摇杆机构';desc='不满足杆长条件，无曲柄';key='gray';}
+    else if(g.shortIdx===3){name='双曲柄机构';desc='满足条件，最短杆为机架';key='info';}
+    else if(g.shortIdx===1){name='双摇杆机构';desc='满足条件，最短杆为连杆';key='warn';}
+    else{name='曲柄摇杆机构';desc='满足条件，最短杆为连架杆';key='info';}
+    return {name,desc,g,key};
+  }
+  function nearSing(th){const p=fourBar(L,th,cx,cy);if(!p)return true;return p.h2<1;}
+  function deadProx(th){const p=fourBar(L,th,cx,cy);if(!p)return 0;const v1x=p.Bx-p.Ax,v1y=p.By-p.Ay,v2x=p.Cx-p.Bx,v2y=p.Cy-p.By;return Math.abs((v1x*v2x+v1y*v2y)/(Math.hypot(v1x,v1y)*Math.hypot(v2x,v2y)));}
+
+  function draw(){
+    while(svg.firstChild)svg.removeChild(svg.firstChild);
+    const Dx=cx+L.d;
+    let pos=fourBar(L,theta,cx,cy);
+    if(!pos){for(let d=1;d<=20&&!pos;d++){let m=fourBar(L,theta-d*Math.PI/180,cx,cy);let p2=fourBar(L,theta+d*Math.PI/180,cx,cy);if(m){theta-=d*Math.PI/180;pos=m;}else if(p2){theta+=d*Math.PI/180;pos=p2;}}}
+    const envPts=[{x:cx-15,y:cy},{x:Dx+15,y:cy}];
+    if(pos)envPts.push({x:pos.Bx,y:pos.By},{x:pos.Cx,y:pos.Cy});
+    const g=E('g',{transform:anchoredTransform(view.s,view.ax,view.ay,360,280)});
+    svg.appendChild(g);
+    g.appendChild(E('line',{x1:cx-15,y1:cy,x2:Dx+15,y2:cy,stroke:'#b4b2a9','stroke-width':0.5,'stroke-dasharray':'3 3'}));
+    if(pos){
+      let atDead=false;
+      if(deadMode){const v1x=pos.Bx-pos.Ax,v1y=pos.By-pos.Ay,v2x=pos.Cx-pos.Bx,v2y=pos.Cy-pos.By;if(Math.abs((v1x*v2x+v1y*v2y)/(Math.hypot(v1x,v1y)*Math.hypot(v2x,v2y)))>0.995)atDead=true;}
+      const cCol=cssv('--crank'),pCol=cssv('--coupler'),rCol=cssv('--rocker');
+      g.appendChild(E('line',{x1:pos.Ax,y1:pos.Ay,x2:pos.Bx,y2:pos.By,stroke:cCol,'stroke-width':atDead?6:4,'stroke-linecap':'round'}));
+      g.appendChild(E('line',{x1:pos.Bx,y1:pos.By,x2:pos.Cx,y2:pos.Cy,stroke:atDead?cCol:pCol,'stroke-width':atDead?6:4,'stroke-linecap':'round'}));
+      g.appendChild(E('line',{x1:pos.Cx,y1:pos.Cy,x2:pos.Dx,y2:pos.Dy,stroke:rCol,'stroke-width':4,'stroke-linecap':'round'}));
+      [['B',pos.Bx,pos.By,cssv('--danger')],['C',pos.Cx,pos.Cy,'#185fa5']].forEach(([lab,x,y,col])=>{
+        const c=E('circle',{cx:x,cy:y,r:8,fill:cssv('--surface'),stroke:col,'stroke-width':2});c.dataset.pt=lab;g.appendChild(c);
+        txt(g,x+(lab==='B'?-13:12),y-11,lab,13,col,'middle',600);
+      });
+      if(atDead){txt(svg,180,20,'⊙ 死点（奇异位形）',13,cssv('--danger'),'middle',600);txt(svg,180,36,'连杆与曲柄共线 · 传动角=0',11,cssv('--danger'),'middle');}
+    }
+    [['A',cx,cy],['D',Dx,cy]].forEach(([lab,x,y])=>{
+      g.appendChild(E('circle',{cx:x,cy:y,r:6,fill:'#5f5e5a'}));
+      g.appendChild(E('path',{d:`M${x-7} ${y+6} L${x+7} ${y+6} L${x} ${y-1} Z`,fill:'none',stroke:'#888780','stroke-width':1}));
+      txt(g,x,y+22,lab,13,cssv('--text2'),'middle');
+    });
+    svg._fitG=g;
+  }
+  function panel(){
+    const r=classify();
+    P.querySelector('#g-name').textContent=r.name;
+    P.querySelector('#g-desc').textContent=r.desc;
+    P.querySelector('#g-sl').textContent=Math.round(r.g.slSum);
+    P.querySelector('#g-pq').textContent=Math.round(r.g.pqSum);
+    const cond=P.querySelector('#g-cond');
+    if(r.g.grashof){cond.textContent='最短+最长 ≤ 其余两杆和 ✓ 满足';cond.style.color='var(--success)';cond.style.background='var(--surface2)';}
+    else{cond.textContent='最短+最长 > 其余两杆和 ✗ 不满足';cond.style.color='var(--danger)';cond.style.background='var(--danger-bg)';}
+    const v=P.querySelector('#g-verdict');
+    v.style.background=r.key==='info'?'var(--info-bg)':r.key==='warn'?'var(--warn-bg)':'var(--surface2)';
+  }
+  function sync(){P.querySelectorAll('.ctrl').forEach(c=>{const k=c.dataset.k;c.querySelector('input').value=L[k];c.querySelector('.val').textContent=Math.round(L[k]);});}
+
+  function step(){
+    if(activeTab==='grashof'&&playing&&!dragging){
+      let spd=0.02;
+      if(deadMode){const prox=deadProx(theta);if(prox>0.995&&deadHold<40){deadHold++;draw();requestAnimationFrame(step);return;}if(prox<=0.995)deadHold=0;spd=deadHold>=40?0.02:0.02-0.017*Math.max(0,(prox-0.7)/0.3);}
+      if(rng.fullRot){let nt=theta+dir*spd;if(nearSing(nt)){dir=-dir;nt=theta+dir*spd;}theta=nt;if(theta>2*Math.PI)theta-=2*Math.PI;if(theta<0)theta+=2*Math.PI;}
+      else if(rng.hi>rng.lo){let nt=theta+dir*spd;if(nt>=rng.hi||nt<=rng.lo||nearSing(nt)){dir=-dir;nt=theta+dir*spd;}theta=Math.max(rng.lo,Math.min(rng.hi,nt));}
+    }
+    draw();requestAnimationFrame(step);
+  }
+
+  P.querySelectorAll('.ctrl input').forEach(inp=>inp.addEventListener('input',e=>{const k=e.target.closest('.ctrl').dataset.k;L[k]=+e.target.value;e.target.closest('.ctrl').querySelector('.val').textContent=Math.round(L[k]);deadMode=false;rebuild();panel();}));
+  P.querySelectorAll('.g-preset').forEach(b=>b.addEventListener('click',()=>{const p=b.dataset.p.split(',').map(Number);L={a:p[0],b:p[1],c:p[2],d:p[3]};deadMode=false;deadHold=0;sync();rebuild();panel();}));
+  P.querySelector('#g-play').addEventListener('click',function(){playing=!playing;this.innerHTML=playing?'⏸ 暂停':'▶ 播放';});
+  P.querySelector('#g-dead').addEventListener('click',()=>{L={a:28,b:80,c:55,d:75};deadMode=true;deadHold=0;playing=true;P.querySelector('#g-play').innerHTML='⏸ 暂停';sync();rebuild();panel();});
+
+  function pt(evt){
+    const r=svg.getBoundingClientRect();
+    const t=evt.touches?evt.touches[0]:evt;
+    let x=(t.clientX-r.left)/r.width*360, y=(t.clientY-r.top)/r.height*280;
+    const g=svg._fitG;
+    if(g){const tr=g.getAttribute('transform');const m=tr.match(/translate\(([-\d.]+),([-\d.]+)\) scale\(([-\d.]+)\)/);if(m){const tx=+m[1],ty=+m[2],s=+m[3];x=(x-tx)/s;y=(y-ty)/s;}}
+    return {x,y};
+  }
+  function down(e){const tg=e.target;if(tg.dataset&&tg.dataset.pt){dragging=tg.dataset.pt;playing=false;P.querySelector('#g-play').innerHTML='▶ 播放';e.preventDefault();}}
+  function move(e){if(!dragging)return;e.preventDefault();const {x,y}=pt(e);if(dragging==='B'){const dx=x-cx,dy=y-cy;L.a=Math.round(Math.max(10,Math.min(100,Math.hypot(dx,dy))));theta=Math.atan2(-(dy),dx);sync();rebuild();panel();theta=Math.atan2(-(dy),dx);}else if(dragging==='C'){const Dx=cx+L.d,dx=x-Dx,dy=y-cy;L.c=Math.round(Math.max(10,Math.min(100,Math.hypot(dx,dy))));sync();rebuild();panel();}}
+  function up(){if(dragging&&!rng.fullRot)dir=(theta-rng.lo)<(rng.hi-theta)?1:-1;dragging=null;}
+  svg.addEventListener('mousedown',down);svg.addEventListener('mousemove',move);window.addEventListener('mouseup',up);
+  svg.addEventListener('touchstart',down,{passive:false});svg.addEventListener('touchmove',move,{passive:false});window.addEventListener('touchend',up);
+
+  MOD.grashof={onShow:()=>{sync();rebuild();panel();}};
+  sync();rebuild();panel();step();
+})();
+
+(function(){
+  const P=document.getElementById('panel-quick');
+  P.innerHTML=`
+  <div class="stage-card"><svg id="q-svg" viewBox="0 0 360 280" role="img"><title>急回特性仿真</title></svg></div>
+  <div class="readouts">
+    <div class="metric"><div class="lab">极位夹角 θ</div><div class="val" id="q-theta">—</div></div>
+    <div class="metric"><div class="lab">行程速比系数 K</div><div class="val" id="q-k">—</div></div>
+  </div>
+  <div id="q-note" style="background:var(--surface2);border-radius:8px;padding:9px 12px;margin-bottom:12px;font-size:12px;color:var(--text2);line-height:1.6;">曲柄匀速转动，工作行程慢、回程快，K&gt;1 即有急回特性。</div>
+  <div class="ctrl" data-k="a"><div class="head"><span><b style="color:var(--crank)">曲柄AB</b></span><span class="val">—</span></div><input type="range" min="35" max="110" step="1" value="55"></div>
+  <div class="ctrl" data-k="b"><div class="head"><span><b style="color:var(--coupler)">连杆BC</b></span><span class="val">—</span></div><input type="range" min="80" max="190" step="1" value="150"></div>
+  <div class="ctrl" data-k="c"><div class="head"><span><b style="color:var(--rocker)">摇杆CD</b></span><span class="val">—</span></div><input type="range" min="60" max="190" step="1" value="90"></div>
+  <div class="ctrl" data-k="d"><div class="head"><span><b style="color:var(--frame)">机架DA</b></span><span class="val">—</span></div><input type="range" min="80" max="190" step="1" value="140"></div>
+  <div class="btnrow">
+    <button id="q-play" class="primary">⏸ 暂停</button>
+    <button id="q-trace">显示极位</button>
+    <span class="seg">预设</span>
+    <button class="q-preset" data-p="55,150,90,140">明显急回</button>
+    <button class="q-preset" data-p="60,135,115,150">轻微急回</button>
+  </div>
+  <p class="hint">两条灰色虚线是摇杆的两个极限位置，夹角即极位夹角 θ。曲柄转过的两段角度不等，导致往复快慢不同，这就是急回特性。</p>`;
+
+  const svg=document.getElementById('q-svg');
+  const cx=110, cy=150;
+  let L={a:55,b:150,c:90,d:140};
+  let theta=0, playing=true, showExt=true;
+  let rng={fullRot:true,lo:0,hi:2*Math.PI};
+  let view={s:1,ax:180,ay:140};
+
+  function rebuild(){ rng=rangeOf(L,cx,cy); view=fitScale(L,cx,cy,360,280,22); }
+  function nearSing(th){const p=fourBar(L,th,cx,cy);if(!p)return true;return p.h2<1;}
+
+  function extremeData(){
+    const Dx=cx+L.d;
+    let crankAngs=[], cPts=[];
+    [L.a+L.b, Math.abs(L.b-L.a)].forEach(ac=>{
+      if(ac>L.d+L.c||ac<Math.abs(L.d-L.c)){crankAngs.push(null);cPts.push(null);return;}
+      const cosDAC=(ac*ac+L.d*L.d-L.c*L.c)/(2*ac*L.d);
+      const angDAC=Math.acos(Math.max(-1,Math.min(1,cosDAC)));
+      crankAngs.push(angDAC);
+      const Cx=cx+ac*Math.cos(-angDAC), Cy=cy-ac*Math.sin(-angDAC);
+      cPts.push({x:Cx,y:Cy});
+    });
+    return {crankAngs,cPts,Dx};
+  }
+  function couplerLineAngles(){
+    return extremeData().crankAngs;
+  }
+
+  function draw(){
+    while(svg.firstChild)svg.removeChild(svg.firstChild);
+    const Dx=cx+L.d;
+    let pos=fourBar(L,theta,cx,cy);
+    if(!pos){for(let d=1;d<=20&&!pos;d++){let m=fourBar(L,theta-d*Math.PI/180,cx,cy);let p2=fourBar(L,theta+d*Math.PI/180,cx,cy);if(m){theta-=d*Math.PI/180;pos=m;}else if(p2){theta+=d*Math.PI/180;pos=p2;}}}
+    const ed=extremeData();
+    const g=E('g',{transform:anchoredTransform(view.s,view.ax,view.ay,360,280)});
+    svg.appendChild(g);
+    g.appendChild(E('line',{x1:cx-15,y1:cy,x2:Dx+15,y2:cy,stroke:'#b4b2a9','stroke-width':0.5,'stroke-dasharray':'3 3'}));
+    if(showExt){
+      ed.cPts.forEach(cp=>{if(cp==null)return;g.appendChild(E('line',{x1:Dx,y1:cy,x2:cp.x,y2:cp.y,stroke:'#888780','stroke-width':1.5,'stroke-dasharray':'4 3'}));g.appendChild(E('circle',{cx:cp.x,cy:cp.y,r:3,fill:'#888780'}));});
+    }
+    if(pos){
+      g.appendChild(E('line',{x1:pos.Ax,y1:pos.Ay,x2:pos.Bx,y2:pos.By,stroke:cssv('--crank'),'stroke-width':4,'stroke-linecap':'round'}));
+      g.appendChild(E('line',{x1:pos.Bx,y1:pos.By,x2:pos.Cx,y2:pos.Cy,stroke:cssv('--coupler'),'stroke-width':4,'stroke-linecap':'round'}));
+      g.appendChild(E('line',{x1:pos.Cx,y1:pos.Cy,x2:pos.Dx,y2:pos.Dy,stroke:cssv('--rocker'),'stroke-width':4,'stroke-linecap':'round'}));
+      [['B',pos.Bx,pos.By,cssv('--crank')],['C',pos.Cx,pos.Cy,cssv('--coupler')]].forEach(([lab,x,y,col])=>{g.appendChild(E('circle',{cx:x,cy:y,r:7,fill:cssv('--surface'),stroke:col,'stroke-width':2}));});
+    }
+    [['A',cx,cy],['D',Dx,cy]].forEach(([lab,x,y])=>{g.appendChild(E('circle',{cx:x,cy:y,r:6,fill:'#5f5e5a'}));g.appendChild(E('path',{d:`M${x-7} ${y+6} L${x+7} ${y+6} L${x} ${y-1} Z`,fill:'none',stroke:'#888780','stroke-width':1}));txt(g,x,y+22,lab,13,cssv('--text2'),'middle');});
+  }
+  function panel(){
+    const ed=extremeData();
+    if(ed.crankAngs[0]!=null&&ed.crankAngs[1]!=null){
+      let theta_ext=Math.abs((ed.crankAngs[0]-ed.crankAngs[1])*180/Math.PI);
+      if(theta_ext>180)theta_ext=360-theta_ext;
+      const K=(180+theta_ext)/(180-theta_ext);
+      P.querySelector('#q-theta').textContent=Math.round(theta_ext)+'°';
+      P.querySelector('#q-k').textContent=K.toFixed(2);
+      const note=P.querySelector('#q-note');
+      if(K>1.15)note.textContent='K明显大于1，有显著急回特性。工作行程慢而有力，回程快，提高效率。';
+      else if(K>1.02)note.textContent='K略大于1，急回特性较轻微。';
+      else note.textContent='K≈1，几乎无急回特性，往复近似匀速。';
+    } else {
+      P.querySelector('#q-theta').textContent='—';
+      P.querySelector('#q-k').textContent='—';
+      P.querySelector('#q-note').textContent='当前杆长曲柄不能整周转动，无法形成稳定急回。请调整为曲柄摇杆机构。';
+    }
+  }
+  function sync(){P.querySelectorAll('.ctrl').forEach(c=>{const k=c.dataset.k;c.querySelector('input').value=L[k];c.querySelector('.val').textContent=Math.round(L[k]);});}
+
+  let dir=1;
+  function step(){
+    if(activeTab==='quick'&&playing){
+      let spd=0.022;
+      if(rng.fullRot){let nt=theta+dir*spd;if(nearSing(nt)){dir=-dir;nt=theta+dir*spd;}theta=nt;if(theta>2*Math.PI)theta-=2*Math.PI;if(theta<0)theta+=2*Math.PI;}
+      else if(rng.hi>rng.lo){let nt=theta+dir*spd;if(nt>=rng.hi||nt<=rng.lo||nearSing(nt)){dir=-dir;nt=theta+dir*spd;}theta=Math.max(rng.lo,Math.min(rng.hi,nt));}
+    }
+    if(activeTab==='quick')draw();
+    requestAnimationFrame(step);
+  }
+
+  P.querySelectorAll('.ctrl input').forEach(inp=>inp.addEventListener('input',e=>{const k=e.target.closest('.ctrl').dataset.k;L[k]=+e.target.value;e.target.closest('.ctrl').querySelector('.val').textContent=Math.round(L[k]);rebuild();panel();}));
+  P.querySelectorAll('.q-preset').forEach(b=>b.addEventListener('click',()=>{const p=b.dataset.p.split(',').map(Number);L={a:p[0],b:p[1],c:p[2],d:p[3]};sync();rebuild();panel();}));
+  P.querySelector('#q-play').addEventListener('click',function(){playing=!playing;this.innerHTML=playing?'⏸ 暂停':'▶ 播放';});
+  P.querySelector('#q-trace').addEventListener('click',function(){showExt=!showExt;this.textContent=showExt?'隐藏极位':'显示极位';});
+
+  MOD.quick={onShow:()=>{sync();rebuild();panel();draw();}};
+  sync();rebuild();panel();step();
+})();
+
+(function(){
+  const P=document.getElementById('panel-trans');
+  P.innerHTML=`
+  <div class="stage-card"><svg id="t-svg" viewBox="0 0 360 300" role="img"><title>传动角仿真</title></svg></div>
+  <div class="readouts">
+    <div class="metric"><div class="lab">当前传动角 γ</div><div class="val" id="t-gamma">—</div></div>
+    <div class="metric"><div class="lab">最小传动角 γmin</div><div class="val" id="t-gmin">—</div></div>
+  </div>
+  <div id="t-warn" style="border-radius:8px;padding:9px 12px;margin-bottom:12px;font-size:12px;line-height:1.6;">—</div>
+  <div class="ctrl" data-k="a"><div class="head"><span><b style="color:var(--crank)">曲柄AB</b></span><span class="val">—</span></div><input type="range" min="35" max="110" step="1" value="55"></div>
+  <div class="ctrl" data-k="b"><div class="head"><span><b style="color:var(--coupler)">连杆BC</b></span><span class="val">—</span></div><input type="range" min="80" max="190" step="1" value="150"></div>
+  <div class="ctrl" data-k="c"><div class="head"><span><b style="color:var(--rocker)">摇杆CD</b></span><span class="val">—</span></div><input type="range" min="60" max="190" step="1" value="100"></div>
+  <div class="ctrl" data-k="d"><div class="head"><span><b style="color:var(--frame)">机架DA</b></span><span class="val">—</span></div><input type="range" min="80" max="190" step="1" value="140"></div>
+  <div class="btnrow">
+    <button id="t-play" class="primary">⏸ 暂停</button>
+    <button id="t-mark">定位γmin</button>
+  </div>
+  <p class="hint">传动角γ是连杆与摇杆的夹角，决定传力效果。γ越接近90°传力越好；γ过小（一般规定 γmin≥40°）时机构接近卡死。连杆与摇杆夹角处实时标出γ，过小时变红。</p>`;
+
+  const svg=document.getElementById('t-svg');
+  const cx=110, cy=160;
+  let L={a:55,b:150,c:100,d:140};
+  let theta=0, playing=true;
+  let rng={fullRot:true,lo:0,hi:2*Math.PI}, gminData={val:90,ang:0};
+  let view={s:1,ax:180,ay:160};
+
+  function rebuild(){
+    rng=rangeOf(L,cx,cy);
+    view=fitScale(L,cx,cy,360,300,28);
+    let gmin=180,gang=0;
+    for(let i=0;i<360;i++){const p=fourBar(L,i*Math.PI/180,cx,cy);if(!p)continue;const g=transAngle(p);if(g<gmin){gmin=g;gang=i*Math.PI/180;}}
+    gminData={val:gmin,ang:gang};
+  }
+  function nearSing(th){const p=fourBar(L,th,cx,cy);if(!p)return true;return p.h2<1;}
+
+  function draw(){
+    while(svg.firstChild)svg.removeChild(svg.firstChild);
+    const Dx=cx+L.d;
+    let pos=fourBar(L,theta,cx,cy);
+    if(!pos){for(let d=1;d<=20&&!pos;d++){let m=fourBar(L,theta-d*Math.PI/180,cx,cy);let p2=fourBar(L,theta+d*Math.PI/180,cx,cy);if(m){theta-=d*Math.PI/180;pos=m;}else if(p2){theta+=d*Math.PI/180;pos=p2;}}}
+    const g=E('g',{transform:anchoredTransform(view.s,view.ax,view.ay,360,300)});
+    svg.appendChild(g);
+    g.appendChild(E('line',{x1:cx-15,y1:cy,x2:Dx+15,y2:cy,stroke:'#b4b2a9','stroke-width':0.5,'stroke-dasharray':'3 3'}));
+    if(pos){
+      const gamma=transAngle(pos);
+      const small=gamma<40;
+      g.appendChild(E('line',{x1:pos.Ax,y1:pos.Ay,x2:pos.Bx,y2:pos.By,stroke:cssv('--crank'),'stroke-width':4,'stroke-linecap':'round'}));
+      g.appendChild(E('line',{x1:pos.Bx,y1:pos.By,x2:pos.Cx,y2:pos.Cy,stroke:cssv('--coupler'),'stroke-width':4,'stroke-linecap':'round'}));
+      g.appendChild(E('line',{x1:pos.Cx,y1:pos.Cy,x2:pos.Dx,y2:pos.Dy,stroke:small?cssv('--danger'):cssv('--rocker'),'stroke-width':4,'stroke-linecap':'round'}));
+      const arcCol=small?cssv('--danger'):cssv('--success');
+      const a1=Math.atan2(pos.By-pos.Cy,pos.Bx-pos.Cx), a2=Math.atan2(pos.Dy-pos.Cy,pos.Dx-pos.Cx);
+      g.appendChild(E('path',{d:describeArc(pos.Cx,pos.Cy,20,a1,a2),fill:'none',stroke:arcCol,'stroke-width':2}));
+      const mid=(a1+a2)/2;
+      txt(g,pos.Cx+30*Math.cos(mid),pos.Cy+30*Math.sin(mid),'γ='+Math.round(gamma)+'°',12,arcCol,'middle',600);
+      [['B',pos.Bx,pos.By,cssv('--crank')],['C',pos.Cx,pos.Cy,cssv('--coupler')]].forEach(([lab,x,y,col])=>{g.appendChild(E('circle',{cx:x,cy:y,r:7,fill:cssv('--surface'),stroke:col,'stroke-width':2}));});
+    }
+    [['A',cx,cy],['D',Dx,cy]].forEach(([lab,x,y])=>{g.appendChild(E('circle',{cx:x,cy:y,r:6,fill:'#5f5e5a'}));g.appendChild(E('path',{d:`M${x-7} ${y+6} L${x+7} ${y+6} L${x} ${y-1} Z`,fill:'none',stroke:'#888780','stroke-width':1}));txt(g,x,y+22,lab,13,cssv('--text2'),'middle');});
+  }
+  function describeArc(cx,cy,r,a1,a2){
+    let da=a2-a1;while(da>Math.PI)da-=2*Math.PI;while(da<-Math.PI)da+=2*Math.PI;
+    const x1=cx+r*Math.cos(a1),y1=cy+r*Math.sin(a1),x2=cx+r*Math.cos(a1+da),y2=cy+r*Math.sin(a1+da);
+    const large=Math.abs(da)>Math.PI?1:0, sweep=da>0?1:0;
+    return `M${x1} ${y1} A${r} ${r} 0 ${large} ${sweep} ${x2} ${y2}`;
+  }
+  function panel(){
+    let pos=fourBar(L,theta,cx,cy);
+    P.querySelector('#t-gamma').textContent=pos?Math.round(transAngle(pos))+'°':'—';
+    P.querySelector('#t-gmin').textContent=Math.round(gminData.val)+'°';
+    const w=P.querySelector('#t-warn');
+    if(gminData.val>=50){w.textContent='γmin ≥ 50°，传力性能良好。';w.style.color='var(--success)';w.style.background='var(--surface2)';}
+    else if(gminData.val>=40){w.textContent='γmin 在 40~50°，满足一般机械的最低要求。';w.style.color='var(--text2)';w.style.background='var(--surface2)';}
+    else{w.textContent='γmin < 40°，传力性能差，机构接近卡死，应重新设计杆长。';w.style.color='var(--danger)';w.style.background='var(--danger-bg)';}
+  }
+  function sync(){P.querySelectorAll('.ctrl').forEach(c=>{const k=c.dataset.k;c.querySelector('input').value=L[k];c.querySelector('.val').textContent=Math.round(L[k]);});}
+
+  let dir=1;
+  function step(){
+    if(activeTab==='trans'&&playing){
+      let spd=0.02;
+      if(rng.fullRot){let nt=theta+dir*spd;if(nearSing(nt)){dir=-dir;nt=theta+dir*spd;}theta=nt;if(theta>2*Math.PI)theta-=2*Math.PI;if(theta<0)theta+=2*Math.PI;}
+      else if(rng.hi>rng.lo){let nt=theta+dir*spd;if(nt>=rng.hi||nt<=rng.lo||nearSing(nt)){dir=-dir;nt=theta+dir*spd;}theta=Math.max(rng.lo,Math.min(rng.hi,nt));}
+    }
+    if(activeTab==='trans'){draw();panel();}
+    requestAnimationFrame(step);
+  }
+
+  P.querySelectorAll('.ctrl input').forEach(inp=>inp.addEventListener('input',e=>{const k=e.target.closest('.ctrl').dataset.k;L[k]=+e.target.value;e.target.closest('.ctrl').querySelector('.val').textContent=Math.round(L[k]);rebuild();}));
+  P.querySelector('#t-play').addEventListener('click',function(){playing=!playing;this.innerHTML=playing?'⏸ 暂停':'▶ 播放';});
+  P.querySelector('#t-mark').addEventListener('click',()=>{theta=gminData.ang;playing=false;P.querySelector('#t-play').innerHTML='▶ 播放';draw();panel();});
+
+  MOD.trans={onShow:()=>{sync();rebuild();panel();draw();}};
+  sync();rebuild();panel();step();
+})();
+
+(function(){
+  const P=document.getElementById('panel-coupler');
+  P.innerHTML=`
+  <div class="stage-card"><svg id="c-svg" viewBox="0 0 360 300" role="img"><title>连杆曲线仿真</title></svg></div>
+  <div id="c-note" style="background:var(--surface2);border-radius:8px;padding:9px 12px;margin-bottom:12px;font-size:12px;color:var(--text2);line-height:1.6;">连杆上一点 P 的运动轨迹叫连杆曲线（耦合曲线）。改变 P 的位置，轨迹形状随之变化——缝纫机、搅拌机正是靠选取合适的 P 点得到所需轨迹。</div>
+  <div class="ctrl"><div class="head"><span>P 点沿连杆位置</span><span class="val" id="c-pos-v">50%</span></div><input type="range" id="c-pos" min="0" max="100" step="1" value="50"></div>
+  <div class="ctrl"><div class="head"><span>P 点偏移连杆距离</span><span class="val" id="c-off-v">0</span></div><input type="range" id="c-off" min="-60" max="60" step="1" value="30"></div>
+  <div class="ctrl" data-k="a"><div class="head"><span><b style="color:var(--crank)">曲柄AB</b></span><span class="val">—</span></div><input type="range" min="35" max="110" step="1" value="50"></div>
+  <div class="ctrl" data-k="b"><div class="head"><span><b style="color:var(--coupler)">连杆BC</b></span><span class="val">—</span></div><input type="range" min="80" max="190" step="1" value="120"></div>
+  <div class="ctrl" data-k="c"><div class="head"><span><b style="color:var(--rocker)">摇杆CD</b></span><span class="val">—</span></div><input type="range" min="60" max="190" step="1" value="120"></div>
+  <div class="ctrl" data-k="d"><div class="head"><span><b style="color:var(--frame)">机架DA</b></span><span class="val">—</span></div><input type="range" min="80" max="190" step="1" value="130"></div>
+  <div class="btnrow">
+    <button id="c-play" class="primary">⏸ 暂停</button>
+    <span class="seg">预设</span>
+    <button class="c-preset" data-p="50,120,120,130" data-pos="50" data-off="40">花瓣形</button>
+    <button class="c-preset" data-p="45,130,90,120" data-pos="70" data-off="0">D字形</button>
+  </div>
+  <p class="hint">紫色曲线是 P 点轨迹。拖动上面两个滑块改变 P 在连杆上的位置和偏移，观察轨迹从椭圆、花瓣到 8 字等形状的变化。</p>`;
+
+  const svg=document.getElementById('c-svg');
+  const cx=120, cy=150;
+  let L={a:50,b:120,c:120,d:130};
+  let theta=0, playing=true, posR=0.5, offD=30;
+  let rng={fullRot:true,lo:0,hi:2*Math.PI}, curve=[];
+  let view={s:1,ax:180,ay:150};
+
+  function rebuild(){
+    rng=rangeOf(L,cx,cy);
+    curve=[];
+    const N=240;
+    for(let i=0;i<=N;i++){
+      let th;
+      if(rng.fullRot)th=i/N*2*Math.PI;
+      else th=rng.lo+(i/N)*(rng.hi-rng.lo);
+      const p=fourBar(L,th,cx,cy);
+      if(!p){curve.push(null);continue;}
+      curve.push(pPoint(p));
+    }
+    view=fitScale(L,cx,cy,360,300,20,curve);
+  }
+  function pPoint(p){
+    const ux=p.Cx-p.Bx, uy=p.Cy-p.By, len=Math.hypot(ux,uy);
+    const nx=-uy/len, ny=ux/len;
+    return {x:p.Bx+ux*posR+nx*offD, y:p.By+uy*posR+ny*offD};
+  }
+  function nearSing(th){const p=fourBar(L,th,cx,cy);if(!p)return true;return p.h2<1;}
+
+  function draw(){
+    while(svg.firstChild)svg.removeChild(svg.firstChild);
+    const Dx=cx+L.d;
+    let pos=fourBar(L,theta,cx,cy);
+    if(!pos){for(let dd=1;dd<=20&&!pos;dd++){let m=fourBar(L,theta-dd*Math.PI/180,cx,cy);let p2=fourBar(L,theta+dd*Math.PI/180,cx,cy);if(m){theta-=dd*Math.PI/180;pos=m;}else if(p2){theta+=dd*Math.PI/180;pos=p2;}}}
+    const g=E('g',{transform:anchoredTransform(view.s,view.ax,view.ay,360,300)});
+    svg.appendChild(g);
+    g.appendChild(E('line',{x1:cx-15,y1:cy,x2:Dx+15,y2:cy,stroke:'#b4b2a9','stroke-width':0.5,'stroke-dasharray':'3 3'}));
+    let d='',started=false;
+    curve.forEach(pt=>{if(!pt){started=false;return;}d+=(started?'L':'M')+pt.x.toFixed(1)+' '+pt.y.toFixed(1)+' ';started=true;});
+    if(rng.fullRot&&d)d+='Z';
+    if(d)g.appendChild(E('path',{d,fill:'none',stroke:'#7f77dd','stroke-width':2}));
+    if(pos){
+      const pp=pPoint(pos);
+      g.appendChild(E('line',{x1:pos.Ax,y1:pos.Ay,x2:pos.Bx,y2:pos.By,stroke:cssv('--crank'),'stroke-width':3.5,'stroke-linecap':'round'}));
+      g.appendChild(E('line',{x1:pos.Bx,y1:pos.By,x2:pos.Cx,y2:pos.Cy,stroke:cssv('--coupler'),'stroke-width':3.5,'stroke-linecap':'round'}));
+      g.appendChild(E('line',{x1:pos.Cx,y1:pos.Cy,x2:pos.Dx,y2:pos.Dy,stroke:cssv('--rocker'),'stroke-width':3.5,'stroke-linecap':'round'}));
+      g.appendChild(E('line',{x1:pos.Bx,y1:pos.By,x2:pp.x,y2:pp.y,stroke:'#7f77dd','stroke-width':1.5,'stroke-dasharray':'3 2'}));
+      g.appendChild(E('line',{x1:pos.Cx,y1:pos.Cy,x2:pp.x,y2:pp.y,stroke:'#7f77dd','stroke-width':1.5,'stroke-dasharray':'3 2'}));
+      [['B',pos.Bx,pos.By,cssv('--crank')],['C',pos.Cx,pos.Cy,cssv('--coupler')]].forEach(([lab,x,y,col])=>{g.appendChild(E('circle',{cx:x,cy:y,r:6,fill:cssv('--surface'),stroke:col,'stroke-width':2}));});
+      g.appendChild(E('circle',{cx:pp.x,cy:pp.y,r:6,fill:'#7f77dd',stroke:cssv('--surface'),'stroke-width':1.5}));
+      txt(g,pp.x+11,pp.y-8,'P',13,'#7f77dd','middle',600);
+    }
+    [['A',cx,cy],['D',Dx,cy]].forEach(([lab,x,y])=>{g.appendChild(E('circle',{cx:x,cy:y,r:5,fill:'#5f5e5a'}));g.appendChild(E('path',{d:`M${x-7} ${y+6} L${x+7} ${y+6} L${x} ${y-1} Z`,fill:'none',stroke:'#888780','stroke-width':1}));txt(g,x,y+22,lab,13,cssv('--text2'),'middle');});
+  }
+  function sync(){P.querySelectorAll('.ctrl[data-k]').forEach(c=>{const k=c.dataset.k;c.querySelector('input').value=L[k];c.querySelector('.val').textContent=Math.round(L[k]);});P.querySelector('#c-pos').value=Math.round(posR*100);P.querySelector('#c-pos-v').textContent=Math.round(posR*100)+'%';P.querySelector('#c-off').value=offD;P.querySelector('#c-off-v').textContent=offD;}
+
+  let dir=1;
+  function step(){
+    if(activeTab==='coupler'&&playing){
+      let spd=0.02;
+      if(rng.fullRot){let nt=theta+dir*spd;if(nearSing(nt)){dir=-dir;nt=theta+dir*spd;}theta=nt;if(theta>2*Math.PI)theta-=2*Math.PI;if(theta<0)theta+=2*Math.PI;}
+      else if(rng.hi>rng.lo){let nt=theta+dir*spd;if(nt>=rng.hi||nt<=rng.lo||nearSing(nt)){dir=-dir;nt=theta+dir*spd;}theta=Math.max(rng.lo,Math.min(rng.hi,nt));}
+    }
+    if(activeTab==='coupler')draw();
+    requestAnimationFrame(step);
+  }
+
+  P.querySelectorAll('.ctrl[data-k] input').forEach(inp=>inp.addEventListener('input',e=>{const k=e.target.closest('.ctrl').dataset.k;L[k]=+e.target.value;e.target.closest('.ctrl').querySelector('.val').textContent=Math.round(L[k]);rebuild();}));
+  P.querySelector('#c-pos').addEventListener('input',e=>{posR=+e.target.value/100;P.querySelector('#c-pos-v').textContent=Math.round(posR*100)+'%';rebuild();});
+  P.querySelector('#c-off').addEventListener('input',e=>{offD=+e.target.value;P.querySelector('#c-off-v').textContent=offD;rebuild();});
+  P.querySelectorAll('.c-preset').forEach(b=>b.addEventListener('click',()=>{const p=b.dataset.p.split(',').map(Number);L={a:p[0],b:p[1],c:p[2],d:p[3]};posR=+b.dataset.pos/100;offD=+b.dataset.off;sync();rebuild();}));
+  P.querySelector('#c-play').addEventListener('click',function(){playing=!playing;this.innerHTML=playing?'⏸ 暂停':'▶ 播放';});
+
+  MOD.coupler={onShow:()=>{sync();rebuild();draw();}};
+  sync();rebuild();step();
+})();
+</script>
+</body>
+</html>
