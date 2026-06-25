@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>齿轮原理仿真 · 各部分名称与尺寸计算</title>
+<style>
+  :root{
+    --bg:#faf9f5; --surface:#ffffff; --surface2:#f1efe8;
+    --text:#2c2c2a; --text2:#5f5e5a; --text3:#888780;
+    --border:rgba(0,0,0,0.12); --border2:rgba(0,0,0,0.22);
+    --success:#3b6d11; --danger:#a32d2d;
+    --info-bg:#e6f1fb; --warn-bg:#faeeda; --danger-bg:#fcebeb;
+    --da:#d4537e; --dp:#378add; --db:#1d9e75; --df:#ba7517; --gear:#888780; --dim:#7f77dd;
+  }
+  @media(prefers-color-scheme:dark){
+    :root{--bg:#1f1e1b;--surface:#2a2926;--surface2:#33322e;
+      --text:#ecebe3;--text2:#b4b2a9;--text3:#888780;
+      --border:rgba(255,255,255,0.14);--border2:rgba(255,255,255,0.24);
+      --success:#97c459;--danger:#f09595;
+      --info-bg:#0c447c;--warn-bg:#633806;--danger-bg:#791f1f;
+      --da:#ed93b1;--dp:#85b7eb;--db:#5dcaa5;--df:#ef9f27;--gear:#b4b2a9;--dim:#aFa9ec;}
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{margin:0;padding:0;
+    font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    background:var(--bg);color:var(--text);line-height:1.5;}
+  .app{max-width:920px;margin:0 auto;padding:16px;}
+  header{margin-bottom:12px;}
+  h1{font-size:20px;font-weight:600;margin:0 0 2px;}
+  .tagline{font-size:12px;color:var(--text2);margin:0;}
+  .tabs{display:flex;gap:6px;margin:14px 0;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px;}
+  .tab{flex:0 0 auto;padding:9px 14px;font-size:13px;border:0.5px solid var(--border2);
+    border-radius:8px;background:var(--surface);color:var(--text2);cursor:pointer;white-space:nowrap;
+    transition:all .15s;min-height:40px;}
+  .tab.active{background:#185fa5;color:#fff;border-color:#185fa5;font-weight:600;}
+  .panel{display:none;}
+  .panel.active{display:block;}
+  @media(min-width:760px){
+    .app{max-width:1100px;padding:24px;}
+    .panel.active{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:0 24px;align-items:start;}
+    .panel.active>.stage-card{grid-column:1;grid-row:1/99;align-self:start;position:sticky;top:16px;margin-bottom:0;}
+    .panel.active>:not(.stage-card){grid-column:2;}
+    h1{font-size:24px;}
+  }
+  .stage-card{background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:8px;margin-bottom:12px;}
+  svg{display:block;width:100%;height:auto;touch-action:none;}
+  .readouts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:12px;}
+  .metric{background:var(--surface2);border-radius:8px;padding:9px 11px;}
+  .metric .lab{font-size:11px;color:var(--text2);margin-bottom:1px;}
+  .metric .val{font-size:17px;font-weight:600;}
+  .metric .formula{font-size:10px;color:var(--text3);margin-top:1px;}
+  .note{border-radius:8px;padding:10px 13px;margin-bottom:12px;font-size:12px;line-height:1.6;background:var(--surface2);color:var(--text2);}
+  .ctrl{margin-bottom:9px;}
+  .ctrl .head{display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px;}
+  .ctrl .val{font-weight:600;font-variant-numeric:tabular-nums;}
+  input[type=range]{width:100%;height:30px;cursor:pointer;accent-color:#185fa5;margin:0;}
+  .btnrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center;}
+  button{font-family:inherit;font-size:13px;padding:9px 13px;background:var(--surface);
+    border:0.5px solid var(--border2);border-radius:8px;cursor:pointer;color:var(--text);
+    min-height:40px;transition:background .15s;}
+  button:active{transform:scale(0.97);}
+  button.primary{border-color:#185fa5;color:#185fa5;}
+  .seg{font-size:12px;color:var(--text2);margin-right:2px;align-self:center;}
+  .hint{font-size:12px;color:var(--text2);margin-top:10px;line-height:1.6;}
+  .legend{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 0;font-size:12px;color:var(--text2);}
+  .legend span{display:inline-flex;align-items:center;gap:5px;cursor:pointer;padding:7px 11px;border-radius:7px;border:0.5px solid var(--border2);min-height:36px;transition:all .12s;}
+  .legend span:active{transform:scale(0.96);}
+  .legend i{width:14px;height:3px;border-radius:2px;display:inline-block;}
+  table.sizes{width:100%;font-size:12px;border-collapse:collapse;margin-bottom:12px;}
+  table.sizes td{padding:5px 6px;border-bottom:0.5px solid var(--border);}
+  table.sizes td:first-child{color:var(--text2);}
+  table.sizes td:nth-child(2){font-family:monospace;color:var(--text3);font-size:11px;}
+  table.sizes td:last-child{text-align:right;font-weight:600;font-variant-numeric:tabular-nums;}
+  text{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;}
+</style>
+</head>
+<body>
+<div id="wx-guide" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:9999;padding:20px;text-align:right;">
+  <div style="color:#fff;font-size:15px;line-height:1.9;margin-top:8px;">
+    <div style="font-size:34px;line-height:1;">↗</div>
+    请点击右上角 <b>···</b><br>选择「在浏览器打开」<br>即可正常使用本仿真
+  </div>
+  <button onclick="document.getElementById('wx-guide').style.display='none'" style="position:absolute;left:20px;bottom:40px;background:#fff;color:#222;border:none;padding:10px 20px;border-radius:8px;font-size:14px;">仍在微信内继续（部分功能受限）</button>
+</div>
+<div class="app">
+<header>
+  <h1>齿轮各部分名称与尺寸计算 <span style="font-size:14px;font-weight:400;color:var(--text2);">by 王晟NUE</span></h1>
+  <p class="tagline">五大圆 · 齿厚齿距 · 模数齿数 · 尺寸联动计算 · 双智驱动 图谱先行</p>
+</header>
+
+<div class="tabs">
+  <button class="tab active" data-tab="parts">① 外齿轮各部分</button>
+  <button class="tab" data-tab="calc">② 内齿轮</button>
+</div>
+
+<div class="panel active" id="panel-parts"></div>
+<div class="panel" id="panel-calc"></div>
+</div>
+
+<script>
+(function(){
+  var ua=navigator.userAgent.toLowerCase();
+  if(ua.indexOf('micromessenger')!==-1){document.getElementById('wx-guide').style.display='block';}
+})();
+const SVGNS='http://www.w3.org/2000/svg';
+function E(tag,a){const e=document.createElementNS(SVGNS,tag);for(const k in a)e.setAttribute(k,a[k]);return e;}
+function txt(p,x,y,s,size,fill,anchor,weight){const t=E('text',{x,y,'font-size':size,fill,'text-anchor':anchor||'start'});if(weight)t.setAttribute('font-weight',weight);t.textContent=s;p.appendChild(t);return t;}
+function cssv(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim();}
+
+const TABS=['parts','calc'];
+let activeTab='parts';
+document.querySelectorAll('.tab').forEach(b=>{
+  b.addEventListener('click',()=>{
+    activeTab=b.dataset.tab;
+    document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t===b));
+    TABS.forEach(t=>document.getElementById('panel-'+t).classList.toggle('active',t===activeTab));
+    if(MOD[activeTab]&&MOD[activeTab].onShow)MOD[activeTab].onShow();
+  });
+});
+
+const MOD={};
+const ALPHA=20*Math.PI/180;
+const INVA=Math.tan(ALPHA)-ALPHA;
+
+function gearGeom(m,z){
+  const d=m*z, r=d/2;
+  const db=d*Math.cos(ALPHA), rbb=db/2;
+  const da=m*(z+2), ra=da/2;
+  const df=m*(z-2.5), rf=df/2;
+  const ha=m, hf=1.25*m, h=2.25*m;
+  const p=Math.PI*m, s=p/2, e=p/2;
+  const pb=p*Math.cos(ALPHA);
+  return {m,z,d,r,db,rbb,da,ra,df,rf,ha,hf,h,p,s,e,pb};
+}
+
+function gearPath(rb,rf,ra,z,phi,centerOff,cxp,cyp,sc){
+  const sH=Math.PI/(2*z), base=sH+INVA;
+  const tEnd=Math.sqrt((ra/rb)*(ra/rb)-1);
+  const rSt=Math.max(rf,rb);
+  const tSt=rSt<=rb?0:Math.sqrt((rSt/rb)*(rSt/rb)-1);
+  function PT(ri,ang){return [cxp+sc*ri*Math.cos(ang), cyp-sc*ri*Math.sin(ang)];}
+  const rfr=sc*rf;
+  let d='', first=true;
+  for(let k=0;k<z;k++){
+    const c=phi+centerOff+k*2*Math.PI/z;
+    let edge=[];
+    for(let i=0;i<=12;i++){const t=tSt+(tEnd-tSt)*i/12;const ri=rb*Math.sqrt(1+t*t);const ai=Math.acos(Math.max(-1,Math.min(1,rb/ri)));const polar=base-(Math.tan(ai)-ai);edge.push([ri,polar]);}
+    // 齿根左侧点
+    const rootL=PT(rf,c-base);
+    if(first){d+='M'+rootL[0].toFixed(2)+' '+rootL[1].toFixed(2)+' ';first=false;}
+    else {d+='L'+rootL[0].toFixed(2)+' '+rootL[1].toFixed(2)+' ';}
+    // 左廓:根到顶
+    for(let i=0;i<edge.length;i++){const pr=PT(edge[i][0],c-edge[i][1]);d+='L'+pr[0].toFixed(2)+' '+pr[1].toFixed(2)+' ';}
+    // 右廓:顶到根
+    for(let i=edge.length-1;i>=0;i--){const pr=PT(edge[i][0],c+edge[i][1]);d+='L'+pr[0].toFixed(2)+' '+pr[1].toFixed(2)+' ';}
+    // 齿根右侧点
+    const rootR=PT(rf,c+base);d+='L'+rootR[0].toFixed(2)+' '+rootR[1].toFixed(2)+' ';
+    // 齿根圆弧连到下一齿(圆滑齿根)
+    const nextC=phi+centerOff+(k+1)*2*Math.PI/z;
+    const nextRootL=PT(rf,nextC-base);
+    d+='A'+rfr.toFixed(2)+' '+rfr.toFixed(2)+' 0 0 0 '+nextRootL[0].toFixed(2)+' '+nextRootL[1].toFixed(2)+' ';
+  }
+  d+='Z';
+  return d;
+}
+
+function internalGearGeom(m,z){
+  const d=m*z, r=d/2;
+  const db=d*Math.cos(ALPHA), rbb=db/2;
+  const da=m*(z-2), ra=da/2;
+  const df=m*(z+2.5), rf=df/2;
+  const ha=m, hf=1.25*m, h=2.25*m;
+  const p=Math.PI*m, s=p/2, e=p/2, pb=p*Math.cos(ALPHA);
+  return {m,z,d,r,db,rbb,da,ra,df,rf,ha,hf,h,p,s,e,pb};
+}
+
+function internalGearPath(rbb,ra,rf,z,phi,centerOff,cxp,cyp,sc,outerR){
+  const sH=Math.PI/(2*z), base=sH+INVA;
+  const rStart=Math.max(ra,rbb);
+  const tEnd=Math.sqrt((rf/rbb)*(rf/rbb)-1);
+  const tSt=rStart<=rbb?0:Math.sqrt((rStart/rbb)*(rStart/rbb)-1);
+  function PT(ri,ang){return [cxp+sc*ri*Math.cos(ang), cyp-sc*ri*Math.sin(ang)];}
+  let d='', first=true;
+  for(let k=0;k<z;k++){
+    const c=phi+centerOff+k*2*Math.PI/z;
+    let edge=[];
+    for(let i=0;i<=10;i++){const t=tSt+(tEnd-tSt)*i/10;const ri=rbb*Math.sqrt(1+t*t);const ai=Math.acos(Math.max(-1,Math.min(1,rbb/ri)));const polar=base-(Math.tan(ai)-ai);edge.push([ri,polar]);}
+    // 齿顶在基圆rbb处,左廓端点(极角=base)
+    const topL=PT(rbb,c-base);
+    d+=(first?'M':'L')+topL[0].toFixed(2)+' '+topL[1].toFixed(2)+' ';first=false;
+    // 左廓:基圆->齿根
+    for(let i=0;i<edge.length;i++){const pr=PT(edge[i][0],c-edge[i][1]);d+='L'+pr[0].toFixed(2)+' '+pr[1].toFixed(2)+' ';}
+    // 齿根圆弧连到右廓
+    const rootR=PT(edge[edge.length-1][0],c+edge[edge.length-1][1]);
+    const rfr=sc*rf;
+    d+='A'+rfr.toFixed(2)+' '+rfr.toFixed(2)+' 0 0 0 '+rootR[0].toFixed(2)+' '+rootR[1].toFixed(2)+' ';
+    // 右廓:齿根->基圆
+    for(let i=edge.length-2;i>=0;i--){const pr=PT(edge[i][0],c+edge[i][1]);d+='L'+pr[0].toFixed(2)+' '+pr[1].toFixed(2)+' ';}
+    // 齿顶圆弧:右廓端点(c+base)连到下一齿左廓端点(nextC-base),贴齿顶
+    const nextC=phi+centerOff+(k+1)*2*Math.PI/z;
+    const nextTopL=PT(rbb,nextC-base);
+    const rbr=sc*rbb;
+    d+='A'+rbr.toFixed(2)+' '+rbr.toFixed(2)+' 0 0 1 '+nextTopL[0].toFixed(2)+' '+nextTopL[1].toFixed(2)+' ';
+  }
+  d+='Z';
+  let outer='';
+  const NO=80;
+  for(let i=0;i<=NO;i++){const a=2*Math.PI*i/NO;const x=cxp+sc*outerR*Math.cos(a),y=cyp-sc*outerR*Math.sin(a);outer+=(i===0?'M':'L')+x.toFixed(2)+' '+y.toFixed(2)+' ';}
+  outer+='Z';
+  return outer+' '+d;
+}
+
+(function(){
+  const P=document.getElementById('panel-parts');
+  P.innerHTML=`
+  <div class="stage-card"><svg id="pt-svg" viewBox="0 0 360 360" role="img"><title>齿轮各部分名称</title></svg>
+  <div class="legend" id="pt-legend">
+    <span data-h="da"><i style="background:var(--da)"></i>齿顶圆 d<sub>a</sub></span>
+    <span data-h="dp"><i style="background:var(--dp)"></i>分度圆 d</span>
+    <span data-h="db"><i style="background:var(--db)"></i>基圆 d<sub>b</sub></span>
+    <span data-h="df"><i style="background:var(--df)"></i>齿根圆 d<sub>f</sub></span>
+    <span data-h="s"><i style="background:var(--dim)"></i>齿厚 s</span>
+    <span data-h="e"><i style="background:var(--dim)"></i>齿槽宽 e</span>
+    <span data-h="p"><i style="background:var(--dim)"></i>齿距 p</span>
+    <span data-h="ha"><i style="background:var(--dim)"></i>齿顶高 h<sub>a</sub></span>
+    <span data-h="hf"><i style="background:var(--dim)"></i>齿根高 h<sub>f</sub></span>
+    <span data-h="h"><i style="background:var(--dim)"></i>全齿高 h</span>
+  </div></div>
+  <div class="note" id="pt-note">点下方任意名称，图上单独显示该部分，其他淡化——画面始终清爽。再次点击取消。默认显示四个基准圆。</div>
+  <table class="sizes" id="pt-table"></table>
+  <div class="ctrl"><div class="head"><span>模数 m</span><span class="val" id="pt-m-v">—</span></div><input type="range" id="pt-m" min="2" max="6" step="1" value="4"></div>
+  <div class="ctrl"><div class="head"><span>齿数 z</span><span class="val" id="pt-z-v">—</span></div><input type="range" id="pt-z" min="10" max="30" step="1" value="18"></div>
+  <p class="hint">四个圆从外到内：齿顶圆 d<sub>a</sub>（齿的最外缘）、分度圆 d（设计基准）、基圆 d<sub>b</sub>（渐开线由此生成）、齿根圆 d<sub>f</sub>（齿槽最底）。齿顶高 h<sub>a</sub>=分度圆到齿顶，齿根高 h<sub>f</sub>=分度圆到齿根。</p>`;
+
+  const svg=document.getElementById('pt-svg');
+  const cx=165, cy=180;
+  let m=4, z=18, highlight=null;
+
+  function fit(g){return Math.min(140/g.ra, 2.2);}
+
+  function draw(){
+    while(svg.firstChild)svg.removeChild(svg.firstChild);
+    const g=gearGeom(m,z);
+    const sc=fit(g);
+    const dimCol=cssv('--dim');
+    const circleKeys={da:1,dp:1,db:1,df:1};
+    const isCircle=highlight in circleKeys;
+    const gp=gearPath(g.rbb,g.rf,g.ra,z,Math.PI/2,Math.PI/z,cx,cy,sc);
+    svg.appendChild(E('path',{d:gp,fill:cssv('--gear'),'fill-opacity':0.08,stroke:'#7c5cd6','stroke-width':2.5,'stroke-linejoin':'round','stroke-linecap':'round'}));
+    // 四个圆: 无选中时全显示(淡), 选中圆时只突出它, 选中齿要素时圆都变淡背景
+    const circles=[['df',g.rf,cssv('--df')],['db',g.rbb,cssv('--db')],['dp',g.r,cssv('--dp')],['da',g.ra,cssv('--da')]];
+    circles.forEach(([key,r,col])=>{
+      const hl=highlight===key;
+      let op;
+      if(!highlight)op=(key==='dp'?1:0.8);
+      else if(hl)op=1;
+      else op=0.15;
+      svg.appendChild(E('circle',{cx,cy,r:sc*r,fill:'none',stroke:col,'stroke-width':hl?2.8:1.2,opacity:op,'stroke-dasharray':key==='dp'?'5 3':(key==='db'?'2 2':'2 0')}));
+    });
+    svg.appendChild(E('circle',{cx,cy,r:3,fill:cssv('--text2')}));
+    // 标注: 默认只标四个圆名(简洁), 选中某项只标该项
+    if(!highlight){
+      txt(svg,cx,cy-sc*g.ra-6,'齿顶圆 d\u2090',11,cssv('--da'),'middle',600);
+      txt(svg,cx,cy+sc*g.rf+15,'齿根圆 d_f',11,cssv('--df'),'middle',600);
+      txt(svg,cx+sc*g.r*0.71,cy-sc*g.r*0.71-3,'分度圆 d',11,cssv('--dp'),'middle',600);
+    } else if(highlight==='da'){ labelCircle(g,sc,g.ra,cssv('--da'),'齿顶圆 d\u2090 = '+g.da); }
+    else if(highlight==='dp'){ labelCircle(g,sc,g.r,cssv('--dp'),'分度圆 d = '+g.d); }
+    else if(highlight==='db'){ labelCircle(g,sc,g.rbb,cssv('--db'),'基圆 d_b = '+g.db.toFixed(1)); }
+    else if(highlight==='df'){ labelCircle(g,sc,g.rf,cssv('--df'),'齿根圆 d_f = '+g.df.toFixed(1)); }
+    else { drawToothDim(svg,g,sc,highlight); }
+  }
+
+  function labelCircle(g,sc,r,col,label){
+    svg.appendChild(E('line',{x1:cx,y1:cy,x2:cx,y2:cy-sc*r,stroke:col,'stroke-width':1.5}));
+    txt(svg,cx+5,cy-sc*r/2,'r',11,col,'start',600);
+    txt(svg,cx,cy-sc*r-8,label,12,col,'middle',600);
+  }
+
+  function drawToothDim(svg,g,sc,which){
+    const dimCol=cssv('--dim');
+    const sH=Math.PI/(2*z);
+    const cAng=Math.PI/2;
+    const xR=cx+sc*g.ra+30;
+    function hRef(r){svg.appendChild(E('line',{x1:cx,y1:cy-sc*r,x2:xR,y2:cy-sc*r,stroke:dimCol,'stroke-width':0.5,opacity:0.4,'stroke-dasharray':'2 2'}));}
+    function vDim(r1,r2,label,val){
+      svg.appendChild(E('line',{x1:xR-8,y1:cy-sc*r1,x2:xR-8,y2:cy-sc*r2,stroke:dimCol,'stroke-width':1.5}));
+      svg.appendChild(E('line',{x1:xR-11,y1:cy-sc*r1,x2:xR-5,y2:cy-sc*r1,stroke:dimCol,'stroke-width':1.5}));
+      svg.appendChild(E('line',{x1:xR-11,y1:cy-sc*r2,x2:xR-5,y2:cy-sc*r2,stroke:dimCol,'stroke-width':1.5}));
+      txt(svg,xR-2,cy-sc*(r1+r2)/2+4,label+'='+val,11,dimCol,'start',600);
+    }
+    const rP=sc*g.r;
+    function arcPt(angOff){return [cx+rP*Math.cos(cAng+angOff), cy-rP*Math.sin(cAng+angOff)];}
+    if(which==='ha'){ hRef(g.ra);hRef(g.r);vDim(g.ra,g.r,'h\u2090',g.ha); txt(svg,cx,cy-sc*g.ra-8,'齿顶高:分度圆→齿顶',11,dimCol,'middle',600);}
+    else if(which==='hf'){ hRef(g.r);hRef(g.rf);vDim(g.r,g.rf,'h_f',g.hf); txt(svg,cx,cy-sc*g.ra-8,'齿根高:分度圆→齿根',11,dimCol,'middle',600);}
+    else if(which==='h'){ hRef(g.ra);hRef(g.rf);vDim(g.ra,g.rf,'h',g.h); txt(svg,cx,cy-sc*g.ra-8,'全齿高:齿顶→齿根',11,dimCol,'middle',600);}
+    else if(which==='s'){
+      const ta=arcPt(-sH), tb=arcPt(sH);
+      svg.appendChild(E('path',{d:`M${ta[0]} ${ta[1]} A${rP} ${rP} 0 0 0 ${tb[0]} ${tb[1]}`,fill:'none',stroke:dimCol,'stroke-width':3.5}));
+      txt(svg,cx,cy-rP-12,'齿厚 s='+g.s.toFixed(2),11,dimCol,'middle',600);
+      txt(svg,cx,cy-rP-26,'(分度圆上一个齿的弧长)',10,cssv('--text3'),'middle');
+    }
+    else if(which==='e'){
+      const ea=arcPt(sH), eb=arcPt(sH+2*sH);
+      svg.appendChild(E('path',{d:`M${ea[0]} ${ea[1]} A${rP} ${rP} 0 0 0 ${eb[0]} ${eb[1]}`,fill:'none',stroke:dimCol,'stroke-width':3.5}));
+      const mid=arcPt(2*sH);
+      txt(svg,mid[0]+6,mid[1],'齿槽宽 e='+g.e.toFixed(2),11,dimCol,'start',600);
+      txt(svg,cx,cy-rP-14,'(分度圆上一个齿槽的弧长)',10,cssv('--text3'),'middle');
+    }
+    else if(which==='p'){
+      const pa=arcPt(-sH), pb2=arcPt(-sH+2*Math.PI/z);
+      svg.appendChild(E('path',{d:`M${pa[0]} ${pa[1]} A${rP} ${rP} 0 0 0 ${pb2[0]} ${pb2[1]}`,fill:'none',stroke:dimCol,'stroke-width':3.5}));
+      svg.appendChild(E('circle',{cx:pa[0],cy:pa[1],r:3,fill:dimCol}));
+      svg.appendChild(E('circle',{cx:pb2[0],cy:pb2[1],r:3,fill:dimCol}));
+      txt(svg,cx,cy-rP-12,'齿距 p='+g.p.toFixed(2),11,dimCol,'middle',600);
+      txt(svg,cx,cy-rP-26,'(相邻两齿对应点的弧长 = s+e)',10,cssv('--text3'),'middle');
+    }
+  }
+
+  function table(){
+    const g=gearGeom(m,z);
+    const rows=[
+      ['分度圆 d','mz',g.d],['齿顶圆 d<sub>a</sub>','m(z+2)',g.da],
+      ['齿根圆 d<sub>f</sub>','m(z−2.5)',g.df.toFixed(1)],['基圆 d<sub>b</sub>','mz·cosα',g.db.toFixed(1)],
+      ['齿距 p','πm',g.p.toFixed(2)],['齿厚 s','πm/2',g.s.toFixed(2)],
+      ['齿槽宽 e','πm/2',g.e.toFixed(2)],['齿顶高 h<sub>a</sub>','m',g.ha],
+      ['齿根高 h<sub>f</sub>','1.25m',g.hf],['全齿高 h','2.25m',g.h],
+    ];
+    P.querySelector('#pt-table').innerHTML=rows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join('');
+    P.querySelector('#pt-m-v').textContent=m;
+    P.querySelector('#pt-z-v').textContent=z;
+  }
+
+  P.querySelectorAll('#pt-legend span').forEach(s=>{
+    function toggle(){const k=s.dataset.h;highlight=highlight===k?null:k;P.querySelectorAll('#pt-legend span').forEach(x=>{const on=x.dataset.h===highlight;x.style.background=on?'#185fa5':'';x.style.color=on?'#fff':'';});draw();}
+    s.addEventListener('click',toggle);
+  });
+  P.querySelector('#pt-m').addEventListener('input',e=>{m=+e.target.value;draw();table();});
+  P.querySelector('#pt-z').addEventListener('input',e=>{z=+e.target.value;draw();table();});
+
+  MOD.parts={onShow:()=>{draw();table();}};
+  draw();table();
+})();
+
+(function(){
+  const P=document.getElementById('panel-calc');
+  P.innerHTML=`
+  <div class="stage-card"><svg id="cl-svg" viewBox="0 0 360 340" role="img"><title>内齿轮</title></svg>
+  <div class="legend" id="cl-legend">
+    <span data-h="da"><i style="background:var(--da)"></i>齿顶圆 d<sub>a</sub></span>
+    <span data-h="dp"><i style="background:var(--dp)"></i>分度圆 d</span>
+    <span data-h="db"><i style="background:var(--db)"></i>基圆 d<sub>b</sub></span>
+    <span data-h="df"><i style="background:var(--df)"></i>齿根圆 d<sub>f</sub></span>
+  </div></div>
+  <div class="note" id="cl-note">内齿轮的齿在圆环<b>内侧</b>，齿顶朝向圆心。关键区别：齿顶圆 d<sub>a</sub> 反而比分度圆<b>小</b>，齿根圆 d<sub>f</sub> 比分度圆<b>大</b>——正好和外齿轮相反。点图例查看各圆。</div>
+  <div class="readouts">
+    <div class="metric"><div class="lab">齿顶圆 d<sub>a</sub>（内齿轮）</div><div class="val" id="cl-da">—</div><div class="formula">d<sub>a</sub> = m(z−2)</div></div>
+    <div class="metric"><div class="lab">齿根圆 d<sub>f</sub>（内齿轮）</div><div class="val" id="cl-df">—</div><div class="formula">d<sub>f</sub> = m(z+2.5)</div></div>
+  </div>
+  <div class="ctrl"><div class="head"><span>模数 m</span><span class="val" id="cl-m-v">—</span></div><input type="range" id="cl-m" min="2" max="6" step="1" value="4"></div>
+  <div class="ctrl"><div class="head"><span>齿数 z</span><span class="val" id="cl-z-v">—</span></div><input type="range" id="cl-z" min="14" max="30" step="1" value="20"></div>
+  <table class="sizes" id="cl-table"></table>
+  <p class="hint">内齿轮与外齿轮对比：分度圆 d、基圆 d<sub>b</sub> 公式相同；但齿顶圆 d<sub>a</sub>=m(z−2)（外齿轮是 m(z+2)），齿根圆 d<sub>f</sub>=m(z+2.5)（外齿轮是 m(z−2.5)）。内齿轮常用于行星齿轮机构，能实现结构紧凑的大传动比。</p>`;
+
+  const svg=document.getElementById('cl-svg');
+  const cx=180, cy=165;
+  let m=4, z=20, highlight=null;
+
+  function fit(g){return Math.min(135/(g.rf+m), 2.2);}
+  function draw(){
+    while(svg.firstChild)svg.removeChild(svg.firstChild);
+    const g=internalGearGeom(m,z);
+    const sc=fit(g);
+    const outerR=g.rf+1.5*m;
+    // 内齿轮:外面是齿圈实体,内部是齿(向心凸)
+    const gp=internalGearPath(g.rbb,g.ra,g.rf,z,Math.PI/2,Math.PI/z,cx,cy,sc,outerR);
+    svg.appendChild(E('path',{d:gp,fill:cssv('--gear'),'fill-opacity':0.1,stroke:'#7c5cd6','stroke-width':2.5,'stroke-linejoin':'round','stroke-linecap':'round','fill-rule':'evenodd'}));
+    const circles=[['da',g.ra,cssv('--da')],['dp',g.r,cssv('--dp')],['db',g.rbb,cssv('--db')],['df',g.rf,cssv('--df')]];
+    circles.forEach(([key,r,col])=>{
+      const hl=highlight===key;
+      let op; if(!highlight)op=(key==='dp'?1:0.8); else if(hl)op=1; else op=0.15;
+      svg.appendChild(E('circle',{cx,cy,r:sc*r,fill:'none',stroke:col,'stroke-width':hl?2.8:1.2,opacity:op,'stroke-dasharray':key==='dp'?'5 3':(key==='db'?'2 2':'2 0')}));
+    });
+    svg.appendChild(E('circle',{cx,cy,r:3,fill:cssv('--text2')}));
+    if(!highlight){
+      txt(svg,cx,cy-sc*g.ra+14,'齿顶圆 d\u2090',11,cssv('--da'),'middle',600);
+      txt(svg,cx,cy-sc*g.rf-6,'齿根圆 d_f',11,cssv('--df'),'middle',600);
+    } else {
+      const labs={da:['齿顶圆 d\u2090 = '+g.da,g.ra,cssv('--da')],dp:['分度圆 d = '+g.d,g.r,cssv('--dp')],db:['基圆 d_b = '+g.db.toFixed(1),g.rbb,cssv('--db')],df:['齿根圆 d_f = '+g.df.toFixed(1),g.rf,cssv('--df')]};
+      const L=labs[highlight];
+      svg.appendChild(E('line',{x1:cx,y1:cy,x2:cx,y2:cy-sc*L[1],stroke:L[2],'stroke-width':1.5}));
+      txt(svg,cx,cy-sc*L[1]-7,L[0],12,L[2],'middle',600);
+    }
+  }
+  function table(){
+    const g=internalGearGeom(m,z);
+    const rows=[
+      ['分度圆 d','mz',g.d],['齿顶圆 d<sub>a</sub>','m(z−2)',g.da],
+      ['齿根圆 d<sub>f</sub>','m(z+2.5)',g.df.toFixed(1)],['基圆 d<sub>b</sub>','mz·cosα',g.db.toFixed(1)],
+      ['齿距 p','πm',g.p.toFixed(2)],['齿厚 s','πm/2',g.s.toFixed(2)],
+      ['齿顶高 h<sub>a</sub>','m',g.ha],['齿根高 h<sub>f</sub>','1.25m',g.hf],
+    ];
+    P.querySelector('#cl-table').innerHTML=rows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join('');
+    P.querySelector('#cl-da').textContent=g.da+' mm';
+    P.querySelector('#cl-df').textContent=g.df.toFixed(1)+' mm';
+    P.querySelector('#cl-m-v').textContent=m;
+    P.querySelector('#cl-z-v').textContent=z;
+  }
+  P.querySelectorAll('#cl-legend span').forEach(s=>{
+    s.addEventListener('click',()=>{const k=s.dataset.h;highlight=highlight===k?null:k;P.querySelectorAll('#cl-legend span').forEach(x=>{const on=x.dataset.h===highlight;x.style.background=on?'#185fa5':'';x.style.color=on?'#fff':'';});draw();});
+  });
+  P.querySelector('#cl-m').addEventListener('input',e=>{m=+e.target.value;draw();table();});
+  P.querySelector('#cl-z').addEventListener('input',e=>{z=+e.target.value;draw();table();});
+
+  MOD.calc={onShow:()=>{draw();table();}};
+  draw();table();
+})();
+</script>
+</body>
+</html>
