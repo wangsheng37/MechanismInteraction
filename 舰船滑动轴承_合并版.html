@@ -1,0 +1,1343 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="color-scheme" content="light">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>舰船滑动轴承 · 结构认知与油膜原理</title>
+<style>
+  :root{
+    --bg:#faf9f5; --surface:#ffffff; --surface2:#f1efe8;
+    --text:#2c2c2a; --text2:#5f5e5a; --text3:#888780;
+    --border:rgba(0,0,0,0.12); --border2:rgba(0,0,0,0.22);
+    --ok:#185fa5; --warn:#ba7517; --danger:#a32d2d;
+    --info-bg:#e6f1fb; --warn-bg:#faeeda; --danger-bg:#fcebeb;
+    --base:#185fa5; --aux:#ba7517; --hl:#d4537e;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{background:var(--bg);color:var(--text);line-height:1.5;
+    font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    -webkit-text-size-adjust:100%;}
+  text{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;}
+  .app{max-width:1180px;margin:0 auto;padding:16px;}
+
+  header{margin-bottom:12px;}
+  h1{font-size:20px;font-weight:600;margin:0 0 2px;}
+  .tagline{font-size:12px;color:var(--text2);margin:0;}
+
+  /* ===== 页签 ===== */
+  .tabs{display:flex;gap:6px;margin:14px 0;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px;}
+  .tab{flex:0 0 auto;font-family:inherit;font-size:15px;font-weight:600;padding:10px 18px;min-height:44px;
+    border-radius:9px;cursor:pointer;border:1px solid var(--border2);background:var(--surface);
+    color:var(--text2);transition:all .15s;white-space:nowrap;touch-action:manipulation;}
+  .tab:active{transform:scale(.97);}
+  .tab.active{background:var(--base);border-color:var(--base);color:#fff;}
+  .panel{display:none;}
+  .panel.active{display:block;}
+
+  /* ===== 通用卡片 / 按钮 ===== */
+  .card{background:var(--surface);border:0.5px solid var(--border);border-radius:12px;overflow:hidden;}
+  .panel-title{padding:11px 16px;font-size:16px;font-weight:600;color:var(--text);
+    border-bottom:0.5px solid var(--border);background:var(--surface);}
+  .panel-title small{font-size:12px;color:var(--text3);font-weight:400;margin-left:8px;}
+  .ctrlbar{display:flex;gap:10px;padding:12px 16px;flex-wrap:wrap;align-items:center;
+    background:var(--surface);border:0.5px solid var(--border);border-radius:12px;margin-bottom:12px;}
+  .fbtn,.mbtn,.pbtn{font-family:inherit;font-weight:700;border-radius:10px;cursor:pointer;
+    border:1.5px solid var(--base);background:var(--surface);color:var(--base);
+    transition:all .2s;touch-action:manipulation;}
+  .fbtn{font-size:17px;padding:12px 22px;min-height:52px;}
+  .fbtn:active,.mbtn:active,.pbtn:active{transform:scale(.97);}
+  .fbtn.on{background:var(--base);color:#fff;}
+  .fbtn:disabled{border-color:var(--border2)!important;color:var(--text3)!important;
+    background:var(--surface2)!important;cursor:not-allowed;transform:none!important;}
+  #a-btnAstern{border-color:var(--aux);color:var(--aux);}
+  #a-btnAstern.on{background:var(--aux);color:#fff;border-color:var(--aux);}
+  #a-btnReveal{border-color:var(--aux);color:var(--aux);}
+  #a-btnReveal:not(:disabled){background:var(--aux);color:#fff;}
+  #a-explodeBtn{margin-left:auto;}
+  #a-btnReset{border-color:var(--danger);color:var(--danger);}
+  .mbtn{font-size:16px;padding:10px 22px;min-height:46px;border-color:var(--border2);color:var(--text2);}
+  .mbtn.on{background:var(--base);border-color:var(--base);color:#fff;}
+
+  /* ===== 零件信息 / 标签 ===== */
+  .chips{display:flex;flex-wrap:wrap;gap:7px;}
+  .chip{font-size:13px;padding:8px 13px;min-height:38px;display:inline-flex;align-items:center;
+    border-radius:8px;cursor:pointer;background:var(--surface2);color:var(--text2);
+    border:0.5px solid var(--border);transition:all .15s;touch-action:manipulation;}
+  .chip.on{background:var(--base);color:#fff;border-color:var(--base);font-weight:600;}
+  .tipbox{position:absolute;pointer-events:none;display:none;background:rgba(44,44,42,.94);
+    color:#fff;font-size:15px;font-weight:600;padding:7px 12px;border-radius:8px;z-index:10;white-space:nowrap;}
+
+  .part{cursor:pointer;touch-action:manipulation;}
+  .part .shape{transition:filter .2s;}
+  .part.hl .shape{filter:drop-shadow(0 0 7px rgba(212,83,126,.9));}
+  .part.hl .ol{stroke:var(--hl);stroke-width:4.5!important;}
+
+  /* ================= 面板 ① 组合轴承 ================= */
+  #pa .part{transition:transform .75s cubic-bezier(.5,.05,.2,1);}
+  #pa .part .shape{transition:filter .3s,opacity .5s;}
+  #pa .part.carry .shape{filter:drop-shadow(0 0 9px rgba(24,95,165,.9));}
+  #pa .part.carry .ol{stroke:var(--ok)!important;stroke-width:4.5!important;}
+  #pa .part.dim .shape{opacity:.38;filter:grayscale(.55);}
+  #a-padsB{transition:opacity .7s ease;}
+  #a-insetPads{transition:filter .2s;}
+  #a-insetPads.pon{filter:drop-shadow(0 0 6px rgba(212,83,126,.9));}
+  #a-insetPads.pon path{stroke:var(--hl);stroke-width:4!important;}
+  #pa .film{fill:#c9c6bb;opacity:.45;transition:all .5s;}
+  #pa .film.on{fill:#f0b429;opacity:.95;}
+
+  #a-statusbar{padding:14px 16px;background:var(--surface);border:0.5px solid var(--border);
+    border-radius:12px;margin-bottom:12px;}
+  #a-stMain{font-size:20px;font-weight:700;color:var(--base);transition:color .3s;}
+  #a-stMain.warn{color:var(--danger);}
+  #a-stFlow{font-size:16px;color:var(--text);margin-top:5px;font-weight:600;}
+  #a-stMsg{font-size:15px;color:var(--text2);margin-top:5px;}
+  #a-stQ{font-size:21px;font-weight:700;color:var(--danger);}
+  #pa .hint{font-size:15px;color:#8a5a12;background:var(--warn-bg);border-radius:8px;
+    padding:9px 14px;margin-top:8px;animation:fadein .5s;}
+  .chrow{display:flex;align-items:center;gap:14px;margin-top:10px;flex-wrap:wrap;}
+  #a-stWait{font-size:17px;font-weight:700;color:var(--aux);}
+  #a-hintBtn{font-family:inherit;font-size:15px;font-weight:700;padding:10px 20px;min-height:44px;
+    border-radius:8px;cursor:pointer;border:1.5px solid var(--aux);background:var(--surface);
+    color:var(--aux);transition:all .15s;touch-action:manipulation;}
+  #a-hintBtn:disabled{border-color:var(--border2);color:var(--text3);cursor:not-allowed;}
+  #a-stConcl .cc1{font-size:18px;font-weight:700;color:var(--base);}
+  #a-stConcl .cc2{font-size:16px;font-weight:600;color:var(--danger);margin-top:4px;}
+  @keyframes fadein{from{opacity:0;transform:translateY(6px);}to{opacity:1;}}
+
+  #pa main{display:flex;gap:12px;align-items:stretch;}
+  #a-stage{flex:1;min-width:0;position:relative;background:var(--surface);
+    border:0.5px solid var(--border);border-radius:12px;padding:10px;}
+  #a-svg{width:100%;height:auto;aspect-ratio:980/600;max-height:560px;display:block;touch-action:manipulation;}
+  #pa aside{width:330px;flex:0 0 auto;background:var(--surface);border:0.5px solid var(--border);
+    border-radius:12px;padding:16px 16px 20px;}
+  #pa aside h2{font-size:16px;font-weight:600;margin-bottom:2px;}
+  #pa .tip0{font-size:12px;color:var(--text3);margin-bottom:12px;}
+  #a-pname{font-size:20px;font-weight:700;color:var(--aux);margin-bottom:8px;min-height:28px;}
+  #a-pfunc{font-size:14px;line-height:1.75;color:var(--text2);min-height:150px;}
+  #pa .plist{margin-top:14px;border-top:1px dashed var(--border2);padding-top:12px;}
+  #pa .plist .cap{font-size:12px;color:var(--text3);margin-bottom:9px;}
+
+  /* ================= 面板 ② 油楔实验 ================= */
+  #pb main{display:flex;gap:12px;align-items:stretch;}
+  #b-left{width:40%;flex:0 0 auto;min-width:0;position:relative;display:flex;flex-direction:column;
+    background:var(--surface);border:0.5px solid var(--border);border-radius:12px;overflow:hidden;}
+  #b-right{flex:1;min-width:0;display:flex;flex-direction:column;
+    background:var(--surface);border:0.5px solid var(--border);border-radius:12px;overflow:hidden;}
+  #b-svgS{width:100%;height:auto;aspect-ratio:520/560;max-height:460px;display:block;}
+  #b-svgL{width:100%;height:auto;aspect-ratio:660/620;max-height:560px;display:block;}
+  #b-partbar{border-top:0.5px solid var(--border);padding:12px 16px 6px;}
+  #b-pname{font-size:17px;color:var(--aux);font-weight:700;}
+  #b-pfunc{font-size:13.5px;line-height:1.65;color:var(--text2);margin-top:4px;}
+  #b-chips{padding:8px 16px 14px;display:flex;flex-wrap:wrap;gap:7px;}
+  #pb .tiltable{transition:transform .25s ease;}
+  #b-tiltState{font-size:14px;}
+  #pb.cls #b-tiltState{display:none;}   /* 课堂模式下方横幅已给出同样信息 */
+
+  #b-condRow{display:flex;gap:8px;padding:11px 16px 8px;flex-wrap:wrap;align-items:center;
+    border-top:0.5px solid var(--border);}
+  .cchip{font-size:13px;padding:7px 13px;border-radius:8px;font-weight:600;
+    border:0.5px solid var(--border2);color:var(--text2);background:var(--surface);transition:all .2s;}
+  .cchip.ok{background:var(--info-bg);border-color:var(--ok);color:var(--ok);}
+  .cchip.bad{background:var(--danger-bg);border-color:var(--danger);color:var(--danger);}
+  .cchip.big{margin-left:auto;font-size:15px;padding:8px 16px;}
+
+  /* 模式相关显隐 */
+  #b-presetBar,#b-classTilt,#b-classBanner{display:none;}
+  #pb.cls #b-presetBar{display:flex;}
+  #pb.cls #b-classBanner{display:block;}
+  #pb.cls #b-controls{display:none;}
+  #pb.cls #b-pfunc{font-size:15px;}
+  #pb.cls .panel-title{font-size:17px;}
+  #pb.cls .cchip{font-size:16px;padding:8px 15px;}
+  #pb.cls .cchip.big{font-size:19px;padding:9px 20px;}
+  #pb.cls #b-classTilt.on{display:flex;}
+
+  #b-presetBar{padding:12px 16px 4px;gap:9px;flex-wrap:wrap;border-bottom:0.5px solid var(--border);}
+  .pbtn{font-size:17px;padding:12px 20px;min-height:52px;}
+  .pbtn.on{background:var(--base);color:#fff;}
+  #b-resetBtn{border-color:var(--danger);color:var(--danger);margin-left:auto;}
+  #b-classTilt{padding:10px 16px 2px;align-items:center;gap:14px;font-size:16px;}
+  #b-classTilt input{flex:1;accent-color:var(--base);height:32px;cursor:pointer;min-width:0;}
+  #b-classTilt .lab{color:var(--text2);font-weight:600;flex:0 0 auto;}
+  #b-classBanner{padding:10px 16px 14px;border-top:0.5px solid var(--border);}
+  #b-cbLine1{font-size:19px;font-weight:700;color:var(--text);}
+  #b-cbLine2{font-size:16px;color:var(--base);font-weight:700;margin-top:2px;}
+  #b-cbMsg{font-size:16px;margin-top:4px;font-weight:600;}
+
+  #b-controls{display:none;padding:10px 16px 16px;grid-template-columns:1fr 1fr;gap:10px 22px;
+    border-top:0.5px solid var(--border);}
+  #pb.exp #b-controls{display:grid;}
+  .ctl{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--text);flex-wrap:wrap;}
+  .ctl label{flex:0 0 76px;font-weight:600;}
+  .ctl input[type=range]{flex:1;accent-color:var(--base);height:28px;cursor:pointer;min-width:110px;}
+  .ctl input[type=range]:disabled{accent-color:#b9b6ad;opacity:.55;}
+  .ctl .val{flex:0 0 90px;text-align:right;color:var(--base);font-weight:700;font-variant-numeric:tabular-nums;}
+  .dirbtns{display:flex;gap:8px;flex-wrap:wrap;}
+  .dirbtns button{font-family:inherit;font-size:13px;font-weight:600;padding:8px 14px;min-height:40px;
+    border-radius:8px;cursor:pointer;border:0.5px solid var(--border2);background:var(--surface);
+    color:var(--text2);transition:all .15s;touch-action:manipulation;}
+  .dirbtns button:active{transform:scale(.97);}
+  .dirbtns button.on{background:var(--base);border-color:var(--base);color:#fff;}
+  .dirbtns button.auto.on{background:var(--aux);border-color:var(--aux);color:#fff;}
+  .switch{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;
+    color:var(--text);cursor:pointer;user-select:none;}
+  .switch input{width:18px;height:18px;accent-color:var(--base);cursor:pointer;}
+  #b-readoutBox{grid-column:1/-1;background:var(--surface2);border-radius:8px;padding:9px 13px;
+    font-size:13px;color:var(--text2);line-height:1.6;}
+  #b-sideNote{grid-column:1/-1;background:var(--warn-bg);border-radius:8px;padding:8px 12px;
+    font-size:13px;color:#8a5a12;line-height:1.6;}
+
+  .flowline{stroke-dasharray:10 8;animation:flowm 1.1s linear infinite;}
+  @keyframes flowm{to{stroke-dashoffset:-18;}}
+
+  .foot{font-size:12px;color:var(--text3);margin:16px 2px 4px;line-height:1.7;}
+
+  /* ================= 移动端 ================= */
+  @media (max-width:960px){
+    .app{padding:12px;}
+    h1{font-size:17px;}
+    #pa main,#pb main{flex-direction:column;}
+    #pa aside{width:auto;}
+    #b-left,#b-right{width:auto;}
+    #a-svg{max-height:400px;}
+    #b-svgS{max-height:360px;}
+    #b-svgL{max-height:470px;}
+    #b-controls{grid-template-columns:1fr;}
+    #a-stMain{font-size:18px;}
+    #a-stFlow{font-size:14.5px;}
+    #a-stMsg{font-size:14px;}
+    #a-stQ{font-size:18px;}
+    .fbtn{font-size:15px;padding:11px 16px;min-height:48px;}
+    .pbtn{font-size:15px;padding:11px 15px;min-height:48px;}
+    .cchip.big{margin-left:0;}
+    #b-resetBtn{margin-left:0;}
+    #a-explodeBtn{margin-left:0;}
+    .ctl label{flex:0 0 66px;}
+    .ctl .val{flex:0 0 80px;}
+  }
+  @media (max-width:520px){
+    .app{padding:10px;}
+    .tab{font-size:13.5px;padding:9px 13px;}
+    #a-svg{max-height:380px;}
+    #b-svgS{max-height:440px;}
+    #b-svgL{max-height:520px;}
+    .fbtn,.pbtn{font-size:14px;padding:10px 13px;min-height:46px;flex:1 1 auto;}
+    #b-resetBtn,#a-explodeBtn,#a-btnReset{flex:0 0 auto;}
+    .switch{margin-left:0!important;}
+    .tipbox{max-width:calc(100vw - 40px);white-space:normal;}
+    #b-tiltState{font-size:13px;}
+    .ctrlbar,#b-presetBar{gap:7px;padding:10px 12px;}
+    #pb.cls .cchip{font-size:13.5px;padding:7px 11px;}
+    #pb.cls .cchip.big{font-size:15px;padding:8px 14px;}
+    #b-cbLine1{font-size:16px;} #b-cbLine2{font-size:14.5px;} #b-cbMsg{font-size:14.5px;}
+    #pa aside,#b-partbar,#a-statusbar{padding-left:13px;padding-right:13px;}
+    .tipbox{font-size:13px;padding:6px 10px;}
+  }
+
+</style>
+</head>
+<body>
+<div id="wx-guide" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:9999;padding:20px;text-align:right;">
+  <div style="color:#fff;font-size:15px;line-height:1.9;margin-top:8px;">
+    <div style="font-size:34px;line-height:1;">↗</div>
+    请点击右上角 <b>···</b><br>选择「在浏览器打开」<br>即可正常使用本仿真
+  </div>
+  <button onclick="document.getElementById('wx-guide').style.display='none'" style="position:absolute;left:20px;bottom:40px;background:#fff;color:#222;border:none;padding:10px 20px;border-radius:8px;font-size:14px;">仍在微信内继续（部分功能受限）</button>
+</div>
+
+<div class="app">
+<header>
+  <h1>舰船滑动轴承 · 结构认知与油膜原理</h1>
+  <p class="tagline">组合轴承 · 双向推力换向 · 动压油楔 · 可倾瓦变载自适应</p>
+</header>
+
+<div class="tabs">
+  <button class="tab active" data-tab="a">① 组合轴承与换向探究</button>
+  <button class="tab" data-tab="b">② 油楔形成与变载实验</button>
+</div>
+
+<div class="panel active" id="pa">
+<div id="a-flowbar" class="ctrlbar">
+  <button class="fbtn on" id="a-btnAhead">正车工作</button>
+  <button class="fbtn" id="a-btnAstern">倒车挑战</button>
+  <button class="fbtn" id="a-btnReveal" disabled>揭示方案</button>
+  <button class="fbtn" id="a-btnReset">重新探究</button>
+  <button class="fbtn alt" id="a-explodeBtn">拆　解</button>
+</div><div id="a-statusbar">
+  <div id="a-stMain">当前承载：正车侧推力瓦组</div>
+  <div id="a-stFlow">力流路径：螺旋桨 → 轴 → 推力环 → 油膜 → 推力瓦 → 支承环 → 轴承座 → 船体</div>
+  <div id="a-stMsg">推力瓦与推力环之间形成动压油膜，承担当前方向的轴向载荷。油膜不仅减小摩擦，还参与轴向推力传递。</div>
+  <div id="a-stChallenge" style="display:none">
+    <div id="a-stQ">推力方向反向后，现有结构还能稳定承载吗？</div>
+    <div class="hint" id="a-hint1" style="display:none">提示一：动压油膜要求运动方向由大间隙指向小间隙。</div>
+    <div class="hint" id="a-hint2" style="display:none">提示二：原承载侧的油楔方向还能满足要求吗？</div>
+    <div class="chrow">
+      <span id="a-stWait">等待结构方案……</span>
+      <button id="a-hintBtn">显示提示一</button>
+    </div>
+  </div>
+  <div id="a-stConcl" style="display:none">
+    <div class="cc1">结论：正车、倒车由推力环两侧的不同瓦组分别承载。</div>
+    <div class="cc2">易错提示：不是同一组推力瓦翻转，而是推力方向改变后，另一侧瓦组进入工作状态。</div>
+  </div>
+</div><main>
+  <div id="a-stage">
+    <svg id="a-svg" viewBox="0 40 980 560" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <linearGradient id="a-shaftG" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#c4c2b8"/><stop offset="100%" stop-color="#94928a"/>
+        </linearGradient>
+        <linearGradient id="a-capG" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#dddad0"/><stop offset="100%" stop-color="#b9b6a8"/>
+        </linearGradient>
+        <linearGradient id="a-seatG" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#cfccc0"/><stop offset="100%" stop-color="#a9a699"/>
+        </linearGradient>
+        <marker id="a-arr" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L9,3 L0,6 Z" fill="#a32d2d"/>
+        </marker>
+      </defs>
+
+      <!-- ===== 轴承座下半（含油池） ===== -->
+      <g class="part" data-key="housing" data-dx="0" data-dy="0">
+        <g class="shape">
+          <rect x="360" y="500" width="70" height="22" rx="3" fill="url(#a-seatG)" class="ol" stroke="#4a4842" stroke-width="3"/>
+          <rect x="550" y="500" width="70" height="22" rx="3" fill="url(#a-seatG)" class="ol" stroke="#4a4842" stroke-width="3"/>
+          <rect x="312" y="332" width="18" height="168" fill="url(#a-seatG)" class="ol" stroke="#4a4842" stroke-width="3"/>
+          <rect x="650" y="332" width="18" height="168" fill="url(#a-seatG)" class="ol" stroke="#4a4842" stroke-width="3"/>
+          <rect x="312" y="482" width="356" height="18" fill="url(#a-seatG)" class="ol" stroke="#4a4842" stroke-width="3"/>
+          <rect x="296" y="332" width="52" height="16" fill="url(#a-seatG)" class="ol" stroke="#4a4842" stroke-width="3"/>
+          <rect x="632" y="332" width="52" height="16" fill="url(#a-seatG)" class="ol" stroke="#4a4842" stroke-width="3"/>
+          <path fill="#f0b429" opacity="0.9" stroke="#ba7517" stroke-width="2"
+            d="M 330 424 Q 345 416 360 424 T 390 424 T 420 424 T 450 424 T 480 424 T 510 424 T 540 424 T 570 424 T 600 424 T 630 424 T 650 424 L 650 482 L 330 482 Z"/>
+        </g>
+      </g>
+
+      <!-- ===== 冷却水管（油池盘管） ===== -->
+      <g class="part" data-key="coil" data-dx="0" data-dy="0">
+        <g class="shape">
+          <path fill="none" class="ol" stroke="#b7791f" stroke-width="8" stroke-linejoin="round"
+            d="M 352 452 L 352 470 L 387 470 L 387 452 L 422 452 L 422 470 L 457 470 L 457 452 L 492 452 L 492 470 L 527 470 L 527 452 L 562 452 L 562 470 L 597 470 L 597 452 L 630 452"/>
+        </g>
+      </g>
+
+      <!-- ===== 径向轴瓦（左右） ===== -->
+      <g class="part" data-key="jbush" data-dx="-170" data-dy="0">
+        <g class="shape">
+          <rect x="188" y="380" width="104" height="16" rx="3" fill="url(#a-seatG)" class="ol" stroke="#4a4842" stroke-width="3"/>
+          <rect x="196" y="336" width="88" height="44" fill="url(#a-seatG)" class="ol" stroke="#4a4842" stroke-width="3"/>
+          <rect x="200" y="246" width="80" height="20" rx="3" fill="url(#a-capG)" class="ol" stroke="#4a4842" stroke-width="3"/>
+          <rect x="204" y="266" width="72" height="16" fill="#c97e3d" class="ol" stroke="#4a4842" stroke-width="2.5"/>
+          <rect x="204" y="322" width="72" height="16" fill="#c97e3d" class="ol" stroke="#4a4842" stroke-width="2.5"/>
+        </g>
+      </g>
+      <g class="part" data-key="jbush" data-dx="170" data-dy="0">
+        <g class="shape">
+          <rect x="684" y="380" width="104" height="16" rx="3" fill="url(#a-seatG)" class="ol" stroke="#4a4842" stroke-width="3"/>
+          <rect x="692" y="336" width="88" height="44" fill="url(#a-seatG)" class="ol" stroke="#4a4842" stroke-width="3"/>
+          <rect x="696" y="246" width="80" height="20" rx="3" fill="url(#a-capG)" class="ol" stroke="#4a4842" stroke-width="3"/>
+          <rect x="700" y="266" width="72" height="16" fill="#c97e3d" class="ol" stroke="#4a4842" stroke-width="2.5"/>
+          <rect x="700" y="322" width="72" height="16" fill="#c97e3d" class="ol" stroke="#4a4842" stroke-width="2.5"/>
+        </g>
+      </g>
+
+      <!-- ===== 支承环（含支承销，左右） ===== -->
+      <g class="part" data-key="ring" data-dx="-95" data-dy="0">
+        <g class="shape">
+          <rect x="385" y="170" width="15" height="264" fill="#a9a699" class="ol" stroke="#4a4842" stroke-width="3"/>
+          <circle cx="407" cy="232" r="8" fill="#8f8d82" class="ol" stroke="#4a4842" stroke-width="2.5"/>
+          <circle cx="407" cy="374" r="8" fill="#8f8d82" class="ol" stroke="#4a4842" stroke-width="2.5"/>
+        </g>
+      </g>
+      <g class="part" data-key="ring" data-dx="95" data-dy="0">
+        <g class="shape">
+          <rect x="580" y="170" width="15" height="264" fill="#a9a699" class="ol" stroke="#4a4842" stroke-width="3"/>
+          <circle cx="573" cy="232" r="8" fill="#8f8d82" class="ol" stroke="#4a4842" stroke-width="2.5"/>
+          <circle cx="573" cy="374" r="8" fill="#8f8d82" class="ol" stroke="#4a4842" stroke-width="2.5"/>
+        </g>
+      </g>
+
+      <!-- ===== 推力瓦（可倾瓦）：初始仅显示当前承载侧 ===== -->
+      <!-- 当前承载侧（初始可见） -->
+      <g class="part carry" id="a-padsA" data-key="padsA" data-dx="45" data-dy="0">
+        <g class="shape">
+          <rect x="535" y="182" width="30" height="96" fill="#c97e3d" class="ol" stroke="#4a4842" stroke-width="3"/>
+          <rect x="535" y="326" width="30" height="96" fill="#c97e3d" class="ol" stroke="#4a4842" stroke-width="3"/>
+          <rect x="529" y="182" width="6" height="96" fill="#f2d16b" stroke="#a3640f" stroke-width="1.5"/>
+          <rect x="529" y="326" width="6" height="96" fill="#f2d16b" stroke="#a3640f" stroke-width="1.5"/>
+        </g>
+      </g>
+      <!-- 另一侧（初始完全隐藏，点击“揭示方案”后才出现） -->
+      <g class="part" id="a-padsB" data-key="padsB" data-dx="-45" data-dy="0" style="display:none">
+        <g class="shape">
+          <rect x="415" y="182" width="30" height="96" fill="#c97e3d" class="ol" stroke="#4a4842" stroke-width="3"/>
+          <rect x="415" y="326" width="30" height="96" fill="#c97e3d" class="ol" stroke="#4a4842" stroke-width="3"/>
+          <rect x="445" y="182" width="6" height="96" fill="#f2d16b" stroke="#a3640f" stroke-width="1.5"/>
+          <rect x="445" y="326" width="6" height="96" fill="#f2d16b" stroke="#a3640f" stroke-width="1.5"/>
+        </g>
+      </g>
+
+      <!-- ===== 油膜（推力环两侧，高亮侧为当前工作油膜） ===== -->
+      <g id="a-filmA" pointer-events="none">
+        <rect class="film on" x="521" y="184" width="7" height="92"/>
+        <rect class="film on" x="521" y="328" width="7" height="92"/>
+      </g>
+      <g id="a-filmB" pointer-events="none" style="display:none">
+        <rect class="film" x="452" y="184" width="7" height="92"/>
+        <rect class="film" x="452" y="328" width="7" height="92"/>
+      </g>
+
+      <!-- ===== 推力环 ===== -->
+      <g class="part" data-key="collar" data-dx="0" data-dy="0">
+        <g class="shape">
+          <rect x="460" y="165" width="60" height="275" fill="url(#a-shaftG)" class="ol" stroke="#4a4842" stroke-width="3"/>
+        </g>
+      </g>
+
+      <!-- ===== 轴 ===== -->
+      <g class="part" data-key="shaft" data-dx="0" data-dy="0">
+        <g class="shape">
+          <rect x="60" y="282" width="860" height="40" fill="url(#a-shaftG)" class="ol" stroke="#4a4842" stroke-width="3"/>
+          <line x1="60" y1="302" x2="920" y2="302" stroke="#4a4842" stroke-width="1.2" stroke-dasharray="9 7" opacity="0.55"/>
+        </g>
+      </g>
+
+      <!-- ===== 轴承座上盖 ===== -->
+      <g class="part" data-key="housing" data-dx="0" data-dy="-150">
+        <g class="shape">
+          <rect x="312" y="118" width="356" height="20" fill="url(#a-capG)" class="ol" stroke="#4a4842" stroke-width="3"/>
+          <rect x="312" y="138" width="18" height="136" fill="url(#a-capG)" class="ol" stroke="#4a4842" stroke-width="3"/>
+          <rect x="650" y="138" width="18" height="136" fill="url(#a-capG)" class="ol" stroke="#4a4842" stroke-width="3"/>
+          <rect x="296" y="258" width="52" height="16" fill="url(#a-capG)" class="ol" stroke="#4a4842" stroke-width="3"/>
+          <rect x="632" y="258" width="52" height="16" fill="url(#a-capG)" class="ol" stroke="#4a4842" stroke-width="3"/>
+        </g>
+      </g>
+
+      <!-- ===== 端面示意（扇形瓦块均布） ===== -->
+      <g id="a-inset">
+        <circle cx="850" cy="128" r="26" fill="#8f8d82" stroke="#4a4842" stroke-width="3"/>
+        <circle cx="850" cy="128" r="5" fill="#4a4842"/>
+        <g id="a-insetPads"></g>
+        <text x="850" y="226" text-anchor="middle" font-size="15" fill="#5f5e5a">端面示意：推力瓦沿圆周均布（8 块）</text>
+      </g>
+
+      <!-- ===== 轴向推力箭头（方向随工况） ===== -->
+      <g id="a-thrustG" pointer-events="none">
+        <path id="a-thrustLine" d="M 140 246 L 430 246" stroke="#a32d2d" stroke-width="6" fill="none" marker-end="url(#a-arr)"/>
+        <text id="a-thrustTxt" x="285" y="228" text-anchor="middle" font-size="17" font-weight="700" fill="#a32d2d">轴向推力（正车）</text>
+      </g>
+
+      <!-- ===== 力流路径：正车 ===== -->
+      <g id="a-forceF" pointer-events="none">
+        <path d="M 100 302 L 445 302" stroke="#a32d2d" stroke-width="5" fill="none" marker-end="url(#a-arr)"/>
+        <path d="M 524 230 L 598 230" stroke="#a32d2d" stroke-width="5" fill="none" marker-end="url(#a-arr)"/>
+        <path d="M 617 255 L 617 468" stroke="#a32d2d" stroke-width="5" fill="none" marker-end="url(#a-arr)"/>
+        <path d="M 617 486 L 575 514" stroke="#a32d2d" stroke-width="5" fill="none" marker-end="url(#a-arr)"/>
+        <text x="585" y="548" text-anchor="middle" font-size="17" font-weight="700" fill="#a32d2d">传给船体基座</text>
+      </g>
+
+      <!-- ===== 力流路径：倒车（揭示方案后才显示） ===== -->
+      <g id="a-forceR" style="display:none" pointer-events="none">
+        <path d="M 100 302 L 455 302" stroke="#a32d2d" stroke-width="5" fill="none" marker-end="url(#a-arr)"/>
+        <path d="M 456 230 L 382 230" stroke="#a32d2d" stroke-width="5" fill="none" marker-end="url(#a-arr)"/>
+        <path d="M 363 255 L 363 468" stroke="#a32d2d" stroke-width="5" fill="none" marker-end="url(#a-arr)"/>
+        <path d="M 363 486 L 400 514" stroke="#a32d2d" stroke-width="5" fill="none" marker-end="url(#a-arr)"/>
+        <text x="392" y="548" text-anchor="middle" font-size="17" font-weight="700" fill="#a32d2d">传给船体基座</text>
+      </g>
+    </svg>
+    <div id="a-tip" class="tipbox"></div>
+  </div>
+
+  <aside>
+    <h2>零件信息</h2>
+    <div class="tip0">点按或悬停查看 · 点按锁定 · 点下方名称亦可</div>
+    <div id="a-pname">—</div>
+    <div id="a-pfunc">点按（或鼠标悬停）结构图上的零件，查看名称与作用。</div>
+    <div class="plist">
+      <div class="cap">零件列表</div>
+      <div class="chips" id="a-chips"></div>
+    </div>
+  </aside>
+</main>
+</div>
+
+<div class="panel cls" id="pb">
+<div id="b-modebar" class="ctrlbar">
+  <button class="mbtn on" id="b-mCls">课堂模式</button>
+  <button class="mbtn" id="b-mExp">自主探究</button>
+</div><main>
+  <!-- ============ 左：基础结构模型 ============ -->
+  <section id="b-left">
+    <div class="panel-title">结构认知<small>基础模型（单侧可倾瓦，轴与推力环一体）</small></div>
+    <svg id="b-svgS" viewBox="0 0 520 560" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <linearGradient id="b-shaftG" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#c4c2b8"/><stop offset="100%" stop-color="#94928a"/>
+        </linearGradient>
+        <linearGradient id="b-seatG" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#cfccc0"/><stop offset="100%" stop-color="#a9a699"/>
+        </linearGradient>
+        <marker id="b-arrO" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L9,3 L0,6 Z" fill="#ba7517"/>
+        </marker>
+      </defs>
+
+      <!-- 轴承座 -->
+      <g class="part" data-key="housing">
+        <g class="shape">
+          <rect x="210" y="432" width="60" height="20" rx="3" fill="url(#b-seatG)" class="ol" stroke="#4a4842" stroke-width="3"/>
+          <rect x="350" y="432" width="60" height="20" rx="3" fill="url(#b-seatG)" class="ol" stroke="#4a4842" stroke-width="3"/>
+          <rect x="170" y="86" width="280" height="16" fill="url(#b-seatG)" class="ol" stroke="#4a4842" stroke-width="3"/>
+          <rect x="170" y="102" width="16" height="132" fill="url(#b-seatG)" class="ol" stroke="#4a4842" stroke-width="3"/>
+          <rect x="170" y="286" width="16" height="128" fill="url(#b-seatG)" class="ol" stroke="#4a4842" stroke-width="3"/>
+          <rect x="434" y="102" width="16" height="132" fill="url(#b-seatG)" class="ol" stroke="#4a4842" stroke-width="3"/>
+          <rect x="434" y="286" width="16" height="128" fill="url(#b-seatG)" class="ol" stroke="#4a4842" stroke-width="3"/>
+          <rect x="170" y="414" width="280" height="18" fill="url(#b-seatG)" class="ol" stroke="#4a4842" stroke-width="3"/>
+          <!-- 油池：油位浸至瓦块与推力环下部 -->
+          <path fill="#f0b429" opacity="0.9" stroke="#ba7517" stroke-width="2"
+            d="M 186 322 Q 202 315 218 322 T 250 322 T 282 322 T 314 322 T 346 322 T 378 322 T 410 322 T 434 322 L 434 414 L 186 414 Z"/>
+          <text x="420" y="407" text-anchor="end" font-size="13" fill="#ba7517">油池</text>
+          <!-- 带油循环示意 -->
+          <path d="M 372 380 A 78 78 0 0 0 372 150" fill="none" stroke="#ba7517" stroke-width="3.5" marker-end="url(#b-arrO)"/>
+          <path d="M 405 392 L 332 392" fill="none" stroke="#ba7517" stroke-width="3.5" marker-end="url(#b-arrO)"/>
+          <text x="60" y="530" font-size="13" fill="#ba7517">油浴润滑：推力环旋转将油带至各瓦块（含上瓦）</text>
+          <text x="60" y="548" font-size="12" fill="#888780">注：瓦块倾斜为联动示意，实际倾斜方向垂直于纸面（圆周方向）——见右侧展开图</text>
+        </g>
+      </g>
+
+      <!-- 支承环 + 支承销 -->
+      <g class="part" data-key="ring">
+        <g class="shape">
+          <rect x="240" y="120" width="13" height="292" fill="#a9a699" class="ol" stroke="#4a4842" stroke-width="3"/>
+          <circle cx="258" cy="182" r="7" fill="#8f8d82" class="ol" stroke="#4a4842" stroke-width="2.5"/>
+          <circle cx="258" cy="338" r="7" fill="#8f8d82" class="ol" stroke="#4a4842" stroke-width="2.5"/>
+        </g>
+      </g>
+
+      <!-- 推力瓦（单侧，可绕支承销倾斜） -->
+      <g class="part" data-key="pads">
+        <g class="shape">
+          <g id="b-padU" class="tiltable">
+            <rect x="265" y="132" width="22" height="100" fill="#c97e3d" class="ol" stroke="#4a4842" stroke-width="3"/>
+            <rect x="287" y="132" width="6" height="100" fill="#f2d16b" stroke="#a3640f" stroke-width="1.5"/>
+            <rect class="oilSliver" x="293" y="132" width="7" height="100" fill="#f0b429" opacity="0.85"/>
+          </g>
+          <g id="b-padL" class="tiltable">
+            <rect x="265" y="288" width="22" height="100" fill="#c97e3d" class="ol" stroke="#4a4842" stroke-width="3"/>
+            <rect x="287" y="288" width="6" height="100" fill="#f2d16b" stroke="#a3640f" stroke-width="1.5"/>
+            <rect class="oilSliver" x="293" y="288" width="7" height="100" fill="#f0b429" opacity="0.85"/>
+          </g>
+        </g>
+      </g>
+
+      <!-- 轴与推力环（一体） -->
+      <g class="part" data-key="shaftcollar">
+        <g class="shape">
+          <rect x="300" y="112" width="52" height="300" fill="url(#b-shaftG)" class="ol" stroke="#4a4842" stroke-width="3"/>
+          <rect x="24" y="240" width="472" height="40" fill="url(#b-shaftG)" class="ol" stroke="#4a4842" stroke-width="3"/>
+          <line x1="24" y1="260" x2="496" y2="260" stroke="#4a4842" stroke-width="1.2" stroke-dasharray="9 7" opacity="0.55"/>
+        </g>
+        <text id="b-rotSym" x="474" y="228" text-anchor="middle" font-size="42" fill="#185fa5">↻</text>
+        <text id="b-rotTxt" x="474" y="200" text-anchor="middle" font-size="15" fill="#5f5e5a">正转</text>
+      </g>
+    </svg>
+    <div id="b-partbar">
+      <div id="b-pname">—</div>
+      <div id="b-pfunc">点按（或鼠标悬停）零件，查看名称与作用。</div>
+    </div>
+    <div id="b-chips" class="chips"></div>
+    <div id="b-tip" class="tipbox"></div>
+  </section>
+
+  <!-- ============ 右：楔形间隙实验台（竖直） ============ -->
+  <section id="b-right">
+    <div class="panel-title">楔形间隙实验台<small>沿圆周方向展开 · 竖直放置（与左图同方向）· 间隙已夸大</small></div>
+
+    <!-- 课堂模式：工况预设大按钮 -->
+    <div id="b-presetBar">
+      <button class="pbtn on" data-p="parallel">平行端面</button>
+      <button class="pbtn" data-p="manual">手动倾瓦</button>
+      <button class="pbtn" data-p="g1">进一</button>
+      <button class="pbtn" data-p="g3">进三</button>
+      <button class="pbtn" data-p="g5">进五</button>
+      <button class="pbtn" id="b-resetBtn">一键复位</button>
+    </div>
+
+    <!-- 课堂模式：手动倾瓦时的简化倾角滑块 -->
+    <div id="b-classTilt">
+      <span class="lab">发散</span>
+      <input type="range" id="b-tiltC" min="-100" max="100" value="0">
+      <span class="lab">收敛</span>
+    </div>
+
+    <svg id="b-svgL" viewBox="0 0 660 620" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <marker id="b-arr2" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L9,3 L0,6 Z" fill="#185fa5"/>
+        </marker>
+        <marker id="b-arr3" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L9,3 L0,6 Z" fill="#a32d2d"/>
+        </marker>
+      </defs>
+
+      <text x="120" y="72" font-size="14" fill="#888780">油膜压力 p（垂直于瓦面画出）</text>
+
+      <!-- 压力曲线（动态） -->
+      <path id="b-pc" fill="rgba(212,83,126,.20)" stroke="#d4537e" stroke-width="2.5"/>
+      <circle id="b-pmaxDot" r="5" fill="#d4537e" style="display:none"/>
+      <text id="b-pmaxT" font-size="15" font-weight="700" fill="#d4537e" style="display:none"></text>
+
+      <!-- 支点高度线 -->
+      <line id="b-pivLine" x1="120" y1="310" x2="518" y2="310" stroke="#8f8d82" stroke-width="1.5" stroke-dasharray="7 6" opacity="0.65"/>
+      <text x="122" y="302" font-size="13" fill="#8f8d82">支点高度（支承销偏心 0.58L，靠出口侧）</text>
+
+      <!-- 合力箭头（动态） -->
+      <line id="b-wArrow" x1="300" y1="310" x2="220" y2="310" stroke="#a32d2d" stroke-width="5" marker-end="url(#b-arr3)" style="display:none"/>
+      <text id="b-wT" font-size="15" font-weight="700" fill="#a32d2d" style="display:none"></text>
+
+      <!-- 推力瓦（竖直，倾角可变） -->
+      <polygon id="b-padPoly" fill="#c97e3d" stroke="#4a4842" stroke-width="3"/>
+      <circle id="b-pivotDot" r="7" fill="#8f8d82" stroke="#4a4842" stroke-width="2.5"/>
+
+      <!-- 楔形油膜区 -->
+      <polygon id="b-wedge" fill="#f0b429" opacity="0.75"/>
+
+      <!-- 油流方向线 -->
+      <g id="b-flowG" stroke="#ba7517" stroke-width="3" fill="none">
+        <line class="flowline" x1="514" y1="130" x2="514" y2="490"/>
+      </g>
+
+      <!-- 推力环运动面（竖直） -->
+      <rect x="520" y="60" width="28" height="500" fill="#8f8d82" stroke="#4a4842" stroke-width="3"/>
+      <text id="b-padLbl" text-anchor="middle" font-size="15" font-weight="700" fill="#fff">推力瓦（静止）</text>
+      <text x="534" y="582" text-anchor="middle" font-size="14" fill="#5f5e5a">推力环侧面（运动面）</text>
+      <line id="b-uArrow" x1="596" y1="180" x2="596" y2="300" stroke="#185fa5" stroke-width="4" marker-end="url(#b-arr2)"/>
+      <text id="b-uTxt" x="596" y="330" text-anchor="middle" font-size="14" fill="#5f5e5a">运动方向（正转）</text>
+
+      <!-- 间隙读数 -->
+      <text id="b-hTopT" x="554" y="94" font-size="14" font-weight="700" fill="#185fa5"></text>
+      <text id="b-hBotT" x="554" y="534" font-size="14" font-weight="700" fill="#185fa5"></text>
+
+      <text id="b-tiltState" x="330" y="606" text-anchor="middle" font-size="18" font-weight="700"></text>
+    </svg>
+
+    <div id="b-condRow">
+      <span class="cchip" id="b-c1">① 收敛间隙</span>
+      <span class="cchip" id="b-c2">② 相对运动</span>
+      <span class="cchip" id="b-c3">③ 连续供油</span>
+      <span class="cchip" id="b-c5">力矩</span>
+      <span class="cchip big" id="b-c4">动压油膜：—</span>
+    </div>
+
+    <!-- 课堂模式：状态横幅 -->
+    <div id="b-classBanner">
+      <div id="b-cbLine1">当前工况：平行端面</div>
+      <div id="b-cbLine2"></div>
+      <div id="b-cbMsg"></div>
+    </div>
+
+    <!-- 自主探究模式：完整参数控制 -->
+    <div id="b-controls">
+      <div class="ctl">
+        <label>旋转方向</label>
+        <div class="dirbtns">
+          <button id="b-dirF" class="on">正转 ↻</button>
+          <button id="b-dirR">反转 ↺</button>
+        </div>
+        <label class="switch" style="margin-left:auto"><input type="checkbox" id="b-oilChk" checked>连续供油</label>
+      </div>
+      <div class="ctl">
+        <label>调倾模式</label>
+        <div class="dirbtns">
+          <button id="b-modeM" class="on">手动调倾</button>
+          <button id="b-modeA" class="auto">自动调倾（可倾瓦平衡）</button>
+        </div>
+      </div>
+      <div class="ctl">
+        <label>瓦块倾角</label>
+        <input type="range" id="b-tilt" min="-100" max="100" value="50">
+        <span class="val" id="b-tiltV"></span>
+      </div>
+      <div class="ctl">
+        <label>载荷 W*</label>
+        <input type="range" id="b-load" min="5" max="1200" step="20" value="60" disabled>
+        <span class="val" id="b-loadV"></span>
+      </div>
+      <div class="ctl">
+        <label>转速 U</label>
+        <input type="range" id="b-spd" min="0" max="10" step="0.1" value="5">
+        <span class="val" id="b-spdV"></span>
+      </div>
+      <div class="ctl">
+        <label>粘度 η</label>
+        <input type="range" id="b-vis" min="10" max="100" value="30">
+        <span class="val" id="b-visV"></span>
+      </div>
+      <div id="b-readoutBox"><b>读数</b>　<span id="b-readout"></span></div>
+      <div id="b-sideNote">注：本页为单侧油楔原理模型，正反转仅用于探究油楔方向的影响，不代表实际双向推力轴承的完整结构。</div>
+    </div>
+  </section>
+</main>
+</div>
+
+<p class="foot">① 页为整机结构与双向推力承载的探究；② 页把推力瓦与推力环之间的那层油膜单独放大，验证动压油膜的三个必要条件与可倾瓦的自适应平衡。两页使用同一套零件命名与配色。</p>
+</div>
+
+<script>
+(function(){
+  var ua=navigator.userAgent.toLowerCase();
+  if(ua.indexOf('micromessenger')!==-1){document.getElementById('wx-guide').style.display='block';}
+})();
+
+/* ================= 页签切换 ================= */
+var TABS=['a','b'], MOD={}, activeTab='a';
+document.querySelectorAll('.tab').forEach(function(b){
+  b.addEventListener('click',function(){
+    activeTab=b.dataset.tab;
+    document.querySelectorAll('.tab').forEach(function(t){t.classList.toggle('active',t===b);});
+    TABS.forEach(function(t){document.getElementById('p'+t).classList.toggle('active',t===activeTab);});
+    if(MOD[activeTab]&&MOD[activeTab].onShow)MOD[activeTab].onShow();
+  });
+});
+
+/* ================= ① 组合轴承与换向探究 ================= */
+(function(){
+const ROOT=document.getElementById('pa');
+
+const $ = id => document.getElementById(id);
+
+/* ================= 课堂状态机 ================= */
+let mode = 'ahead';        // 'ahead' 正车 | 'astern' 倒车
+let revealed = false;      // 是否已揭示另一侧瓦组
+let hintStep = 0;          // 挑战提示进度
+let exploded = false;
+
+/* 零件说明：揭示前一律使用中性名称，不暴露双侧结构 */
+function infoOf(key) {
+  const T = {
+    shaft:  { n:"轴（推力轴）", f:"传递螺旋桨的扭矩和轴向推力。推力轴承承担轴系轴向定位，并将螺旋桨产生的轴向推力传递给船体。" },
+    collar: { n:"推力环", f:"与轴一体锻造（或热装），随轴旋转，侧面为精密加工端面。螺旋桨推力经推力环侧面 → 油膜 → 推力瓦传出，是力流路径上的关键一环；其下部浸在油池滑油中。" },
+    ring:   { n:"支承环（含支承销）", f:"支承推力瓦；支承销是瓦块摆动的支点，让每块瓦自由摆动、自动调节载荷均匀。轴向推力经支承环传给轴承座。" },
+    housing:{ n:"轴承座（含油池）", f:"剖分式壳体，承受轴向推力并传递给船体基座。底部油池储油，推力环与瓦块下部浸在油中——油浴润滑。" },
+    jbush:  { n:"径向轴瓦（×2）", f:"径向轴瓦承担轴系径向载荷并保持轴系稳定，推力瓦承担轴向推力，两种油膜在同一轴承装置中分工协作。" },
+    coil:   { n:"冷却水管", f:"油池中的盘管，通冷却水带走摩擦热、控制油温——对应整机两侧的循环冷却管路。" }
+  };
+  if (key === 'padsA') {
+    return revealed
+      ? { n:"正车侧推力瓦组", f:"正车工况的承载瓦组。扇形瓦块沿圆周均布，工作面浇铸巴氏合金；背部支承销偏心布置，瓦块随推力环旋转形成收敛油楔。力流：推力环 → 正车侧油膜 → 本组推力瓦 → 支承环 → 轴承座。" }
+      : { n:"推力瓦（可倾瓦）", f:"扇形瓦块沿圆周均布（见右上角端面示意），工作面浇铸巴氏合金。背部支承销偏心布置，允许瓦块微量倾斜，随推力环旋转形成楔形间隙。推力瓦与推力环之间形成动压油膜，承担当前方向的轴向载荷。" };
+  }
+  if (key === 'padsB') {
+    return { n:"倒车侧推力瓦组", f:"推力反向（倒车）时由本组瓦块进入工作状态：其油楔方向与正车侧相反，恰好满足“由大间隙指向小间隙”的运动要求。正车、倒车由推力环两侧的不同瓦组分别承载，构成双向推力承载结构。" };
+  }
+  return T[key];
+}
+
+// 端面示意：程序化生成 8 个扇形瓦块
+(function () {
+  const ig = $('a-insetPads');
+  const cx = 850, cy = 128, r0 = 34, r1 = 78;
+  for (let i = 0; i < 8; i++) {
+    const a0 = (i * 45 + 4) * Math.PI / 180, a1 = (i * 45 + 41) * Math.PI / 180;
+    const p = (r, a) => [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+    const [x1, y1] = p(r1, a0), [x2, y2] = p(r1, a1), [x3, y3] = p(r0, a1), [x4, y4] = p(r0, a0);
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', `M${x1.toFixed(1)},${y1.toFixed(1)} A${r1},${r1} 0 0 1 ${x2.toFixed(1)},${y2.toFixed(1)} L${x3.toFixed(1)},${y3.toFixed(1)} A${r0},${r0} 0 0 0 ${x4.toFixed(1)},${y4.toFixed(1)} Z`);
+    path.setAttribute('fill', '#c97e3d');
+    path.setAttribute('stroke', '#4a4842');
+    path.setAttribute('stroke-width', '2.5');
+    ig.appendChild(path);
+  }
+})();
+
+const svg = $('a-svg');
+const tip = $('a-tip');
+const pname = $('a-pname');
+const pfunc = $('a-pfunc');
+const chipsBox = $('a-chips');
+const insetPads = $('a-insetPads');
+let pinned = null;
+
+// 同一零件可对应多个图形组（如左右径向轴瓦、上下壳体）
+const groups = {};
+ROOT.querySelectorAll('.part').forEach(g => {
+  (groups[g.dataset.key] = groups[g.dataset.key] || []).push(g);
+});
+
+function select(key, lock) {
+  ROOT.querySelectorAll('.part').forEach(p => p.classList.remove('hl'));
+  ROOT.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c.dataset.key === key));
+  insetPads.classList.toggle('pon', key === 'padsA' || key === 'padsB');
+  if (key && groups[key]) groups[key].forEach(g => g.classList.add('hl'));
+  if (key && infoOf(key)) { pname.textContent = infoOf(key).n; pfunc.textContent = infoOf(key).f; }
+  else { pname.textContent = '—'; pfunc.textContent = '点按（或鼠标悬停）结构图上的零件，查看名称与作用。'; }
+  if (lock !== undefined) pinned = lock ? key : null;
+}
+
+function showTip(e, key) {
+  tip.style.display = 'block';
+  tip.textContent = infoOf(key).n;
+  const stage = $('a-stage').getBoundingClientRect();
+  const cx = e.clientX !== undefined ? e.clientX : (e.touches && e.touches[0].clientX);
+  const cy = e.clientY !== undefined ? e.clientY : (e.touches && e.touches[0].clientY);
+  tip.style.left = '0px'; tip.style.top = '0px';
+  const tw = tip.offsetWidth, th = tip.offsetHeight;
+  let lx = cx - stage.left + 18, ly = cy - stage.top + 14;
+  lx = Math.max(6, Math.min(lx, stage.width  - tw - 6));
+  ly = Math.max(6, Math.min(ly, stage.height - th - 6));
+  tip.style.left = lx + 'px'; tip.style.top = ly + 'px';
+}
+Object.keys(groups).forEach(key => {
+  groups[key].forEach(g => {
+    g.addEventListener('pointermove', e => {          // 鼠标悬停预览
+      if (e.pointerType && e.pointerType !== 'mouse') return;
+      if (!pinned) select(key);
+      showTip(e, key);
+    });
+    g.addEventListener('pointerdown', e => {          // 点按即锁定（鼠标/触屏通用）
+      select(key, true);
+      showTip(e, key);
+      setTimeout(() => { tip.style.display = 'none'; }, 1300);
+    });
+    g.addEventListener('pointerleave', e => {
+      if (e.pointerType && e.pointerType !== 'mouse') return;
+      tip.style.display = 'none';
+      if (!pinned) select(null);
+    });
+  });
+});
+
+/* 零件列表：揭示前不出现另一侧瓦组 */
+function buildChips() {
+  chipsBox.innerHTML = '';
+  const keys = revealed
+    ? ['shaft', 'collar', 'padsA', 'padsB', 'ring', 'housing', 'jbush', 'coil']
+    : ['shaft', 'collar', 'padsA', 'ring', 'housing', 'jbush', 'coil'];
+  keys.forEach(key => {
+    const c = document.createElement('span');
+    c.className = 'chip'; c.dataset.key = key; c.textContent = infoOf(key).n;
+    c.onclick = () => select(key, true);
+    chipsBox.appendChild(c);
+  });
+}
+
+/* ================= 力流与覆盖层 ================= */
+function updateOverlays() {
+  const show = !exploded;
+  $('a-thrustG').style.display = show ? '' : 'none';
+  $('a-forceF').style.display = (show && mode === 'ahead') ? '' : 'none';
+  $('a-forceR').style.display = (show && mode === 'astern' && revealed) ? '' : 'none';
+}
+
+/* ================= 课堂状态应用 ================= */
+function applyState() {
+  const pA = $('a-padsA'), pB = $('a-padsB');
+
+  /* 另一侧瓦组：仅在揭示后可见（揭示前完全隐藏，无轮廓、无标签、不可点） */
+  if (revealed && pB.style.display === 'none') {
+    pB.style.display = '';
+    pB.style.opacity = 0;
+    requestAnimationFrame(() => requestAnimationFrame(() => { pB.style.opacity = 1; }));
+    $('a-filmB').style.display = '';
+  } else if (!revealed) {
+    pB.style.display = 'none';
+    $('a-filmB').style.display = 'none';
+  }
+
+  /* 承载高亮 / 失效变灰 */
+  pA.classList.toggle('carry', mode === 'ahead');
+  pA.classList.toggle('dim', mode === 'astern');
+  pB.classList.toggle('carry', revealed && mode === 'astern');
+  pB.classList.toggle('dim', revealed && mode === 'ahead');
+
+  /* 油膜高亮 */
+  $('a-filmA').querySelectorAll('.film').forEach(f => f.classList.toggle('on', mode === 'ahead'));
+  $('a-filmB').querySelectorAll('.film').forEach(f => f.classList.toggle('on', revealed && mode === 'astern'));
+
+  /* 轴向推力箭头 */
+  if (mode === 'ahead') {
+    $('a-thrustLine').setAttribute('d', 'M 140 246 L 430 246');
+    $('a-thrustTxt').textContent = '轴向推力（正车）';
+  } else {
+    $('a-thrustLine').setAttribute('d', 'M 430 246 L 140 246');
+    $('a-thrustTxt').textContent = '轴向推力（倒车·已反向）';
+  }
+  updateOverlays();
+
+  /* 状态条 */
+  const stMain = $('a-stMain'), stFlow = $('a-stFlow'), stMsg = $('a-stMsg');
+  $('a-stChallenge').style.display = (mode === 'astern' && !revealed) ? '' : 'none';
+  $('a-stConcl').style.display = revealed ? '' : 'none';
+  if (mode === 'ahead') {
+    stMain.textContent = '当前承载：正车侧推力瓦组';
+    stMain.classList.remove('warn');
+    stFlow.style.display = '';
+    stFlow.textContent = revealed
+      ? '力流路径（正车）：螺旋桨 → 轴 → 推力环 → 正车侧油膜 → 正车侧推力瓦 → 支承环 → 轴承座 → 船体'
+      : '力流路径：螺旋桨 → 轴 → 推力环 → 油膜 → 推力瓦 → 支承环 → 轴承座 → 船体';
+    stMsg.style.display = '';
+    stMsg.textContent = '推力瓦与推力环之间形成动压油膜，承担当前方向的轴向载荷。油膜不仅减小摩擦，还参与轴向推力传递。';
+  } else if (!revealed) {
+    stMain.textContent = '工况：倒车（轴向推力反向）';
+    stMain.classList.add('warn');
+    stFlow.style.display = 'none';                  // 挑战状态：不显示任何完整力流路径
+    stMsg.style.display = 'none';
+  } else {
+    stMain.textContent = '当前承载：倒车侧推力瓦组';
+    stMain.classList.remove('warn');
+    stFlow.style.display = '';
+    stFlow.textContent = '力流路径（倒车）：螺旋桨 → 轴 → 推力环 → 倒车侧油膜 → 倒车侧推力瓦 → 支承环 → 轴承座 → 船体';
+    stMsg.style.display = 'none';
+  }
+
+  /* 零件列表随揭示状态更新 */
+  buildChips();
+  if (pinned) select(pinned);
+
+  /* 按钮状态（防止重复点击导致状态错乱） */
+  $('a-btnAhead').classList.toggle('on', mode === 'ahead');
+  $('a-btnAstern').classList.toggle('on', mode === 'astern');
+  $('a-btnReveal').disabled = !(mode === 'astern' && !revealed);
+}
+
+/* ================= 课堂流程按钮 ================= */
+$('a-btnAhead').onclick = () => {
+  mode = 'ahead';
+  applyState();
+};
+$('a-btnAstern').onclick = () => {
+  if (mode === 'astern' && !revealed) return;
+  mode = 'astern';
+  if (!revealed) {                                  // 进入挑战：重置提示进度
+    hintStep = 0;
+    $('a-hint1').style.display = 'none';
+    $('a-hint2').style.display = 'none';
+    $('a-hintBtn').disabled = false;
+    $('a-hintBtn').textContent = '显示提示一';
+  }
+  applyState();
+};
+$('a-btnReveal').onclick = () => {
+  if (!(mode === 'astern' && !revealed)) return;    // 仅在挑战状态下可揭示
+  revealed = true;
+  applyState();
+};
+$('a-btnReset').onclick = () => {                     // 重新探究：完全恢复初始状态
+  mode = 'ahead'; revealed = false; hintStep = 0;
+  $('a-hint1').style.display = 'none';
+  $('a-hint2').style.display = 'none';
+  $('a-hintBtn').disabled = false;
+  $('a-hintBtn').textContent = '显示提示一';
+  select(null); pinned = null;
+  if (exploded) $('a-explodeBtn').click();
+  applyState();
+};
+$('a-hintBtn').onclick = () => {                      // 教师逐条放出提示
+  if (hintStep === 0) { $('a-hint1').style.display = ''; hintStep = 1; $('a-hintBtn').textContent = '显示提示二'; }
+  else if (hintStep === 1) { $('a-hint2').style.display = ''; hintStep = 2; $('a-hintBtn').disabled = true; $('a-hintBtn').textContent = '提示已显示完'; }
+};
+
+/* ================= 拆解 / 合拢（含视野缩放） ================= */
+const btn = $('a-explodeBtn');
+const VB_A = [0, 40, 980, 560], VB_B = [0, -140, 980, 700];
+let vbCur = VB_A.slice(), vbRaf = null;
+function tweenVB(target) {
+  const from = vbCur.slice(), t0 = performance.now(), dur = 750;
+  if (vbRaf) cancelAnimationFrame(vbRaf);
+  (function step(t) {
+    let k = Math.min(1, (t - t0) / dur);
+    k = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+    vbCur = from.map((v, i) => v + (target[i] - v) * k);
+    svg.setAttribute('viewBox', vbCur.join(' '));
+    if (k < 1) vbRaf = requestAnimationFrame(step);
+  })(t0);
+}
+btn.onclick = () => {
+  exploded = !exploded;
+  ROOT.querySelectorAll('.part').forEach(g => {
+    const dx = exploded ? parseFloat(g.dataset.dx) : 0;
+    const dy = exploded ? parseFloat(g.dataset.dy) : 0;
+    g.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+  });
+  updateOverlays();       // 拆解时力流/推力箭头位置失效，自动隐藏；合拢后按状态恢复
+  tweenVB(exploded ? VB_B : VB_A);
+  btn.textContent = exploded ? '合　拢' : '拆　解';
+};
+
+applyState();
+
+})();
+
+/* ================= ② 油楔形成与变载实验 ================= */
+(function(){
+const ROOT=document.getElementById('pb');
+
+/* ================= 左侧：结构认知 ================= */
+const INFO = {
+  shaftcollar: { n:"轴与推力环（一体锻造）",
+    f:"基础模型中推力环与轴锻为一体，结构最简单。推力环左侧面为工作面，下部浸在油中，旋转时将滑油带向各瓦块——右侧实验台研究的正是工作面上发生的事。" },
+  pads:   { n:"推力瓦（可倾瓦，单侧布置）",
+    f:"仅在承载侧布置可倾瓦。工作面浇铸巴氏合金；背部支承销偏心布置（靠出口侧 0.58L），瓦块可绕支点微量摆动——工况变化时油膜压力分布改变，瓦块摆动至重新平衡，请到右侧实验台亲手验证。" },
+  ring:   { n:"支承环（含支承销）",
+    f:"支承全部瓦块，并把轴向推力传给轴承座；支承销是瓦块摆动的支点。" },
+  housing:{ n:"轴承座（含油池）",
+    f:"固定于船体基座，承受并传出轴向推力。油池油位浸至瓦块与推力环下部，旋转带油润滑全部瓦块（油浴润滑）；大型轴承另设压力循环喷油，直接向瓦面供油，上瓦润滑更有保障。" }
+};
+const tip = document.getElementById('b-tip');
+const pname = document.getElementById('b-pname');
+const pfunc = document.getElementById('b-pfunc');
+const chipsBox = document.getElementById('b-chips');
+let pinned = null;
+let mode = 'cls';      // 'cls' 课堂模式 | 'exp' 自主探究
+
+function select(key, lock) {
+  ROOT.querySelectorAll('.part').forEach(p => p.classList.remove('hl'));
+  ROOT.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c.dataset.key === key));
+  if (key) ROOT.querySelector('.part[data-key="' + key + '"]').classList.add('hl');
+  if (key && INFO[key]) {
+    pname.textContent = INFO[key].n;
+    pfunc.textContent = INFO[key].f;
+  }
+  else { pname.textContent = '—'; pfunc.textContent = '点按（或鼠标悬停）零件，查看名称与作用。'; }
+  if (lock !== undefined) pinned = lock ? key : null;
+}
+function showTipB(e, key) {
+  tip.style.display = 'block'; tip.textContent = INFO[key].n;
+  const r = document.getElementById('b-left').getBoundingClientRect();
+  const cx = e.clientX !== undefined ? e.clientX : (e.touches && e.touches[0].clientX);
+  const cy = e.clientY !== undefined ? e.clientY : (e.touches && e.touches[0].clientY);
+  tip.style.left = '0px'; tip.style.top = '0px';
+  const tw = tip.offsetWidth, th = tip.offsetHeight;
+  let lx = cx - r.left + 16, ly = cy - r.top + 12;
+  lx = Math.max(6, Math.min(lx, r.width  - tw - 6));
+  ly = Math.max(6, Math.min(ly, r.height - th - 6));
+  tip.style.left = lx + 'px'; tip.style.top = ly + 'px';
+}
+ROOT.querySelectorAll('.part').forEach(g => {
+  const key = g.dataset.key;
+  g.addEventListener('pointermove', e => {
+    if (e.pointerType && e.pointerType !== 'mouse') return;
+    if (!pinned) select(key);
+    showTipB(e, key);
+  });
+  g.addEventListener('pointerdown', e => {
+    select(key, true);
+    showTipB(e, key);
+    setTimeout(() => { tip.style.display = 'none'; }, 1300);
+  });
+  g.addEventListener('pointerleave', e => {
+    if (e.pointerType && e.pointerType !== 'mouse') return;
+    tip.style.display = 'none'; if (!pinned) select(null);
+  });
+});
+Object.keys(INFO).forEach(key => {
+  const c = document.createElement('span');
+  c.className = 'chip'; c.dataset.key = key; c.textContent = INFO[key].n;
+  c.onclick = () => select(key, true);
+  chipsBox.appendChild(c);
+});
+
+/* ================= 右侧：楔形间隙实验（竖直） ================= */
+const $ = id => document.getElementById(id);
+const Y0 = 90, Y1 = 530, XC = 520, K = 2200, Lm = 0.1, N = 120;
+const G0 = 0.05, DMAX = 0.04, LAM = 0.58;              // 支承销偏心（自入口 0.58L）
+let dir = 1;                                           // 1 正转(运动面向下), -1 反转
+let auto = false;                                      // 调倾模式
+let preset = 'parallel';                               // 课堂模式当前工况
+let curH = { t: 0.05, b: 0.05 };                       // 当前显示的顶/底间隙 mm
+let tween = null, overload = false;
+
+/* 一维雷诺方程（无限宽斜面滑块）：p(0)=p(L)=0 */
+function solveP(haMm, hbMm, U, eta) {
+  const dx = Lm / N;
+  const h = s => (haMm + (hbMm - haMm) * s) / 1000;    // s∈[0,1] 入口→出口
+  const F = h0 => {
+    let v = 0;
+    for (let i = 1; i <= N; i++) { const hh = h(i / N); v += (hh - h0) / (hh * hh * hh) * dx; }
+    return v;
+  };
+  let lo = hbMm / 1000, hi = haMm / 1000;
+  if (F(lo) < 0 || F(hi) > 0) return null;
+  for (let k = 0; k < 40; k++) { const m = (lo + hi) / 2; if (F(m) > 0) lo = m; else hi = m; }
+  const h0 = (lo + hi) / 2;
+  const p = [0]; let W = 0, M = 0, pmax = 0, smax = 0;
+  for (let i = 1; i <= N; i++) {
+    const s = i / N, hh = h(s);
+    const pi = p[i - 1] + 6 * eta * U * (hh - h0) / (hh * hh * hh) * dx;
+    p.push(pi);
+    W += (p[i - 1] + pi) / 2 * dx;
+    M += (p[i - 1] + pi) / 2 * dx * s;
+    if (pi > pmax) { pmax = pi; smax = s; }
+  }
+  return { p, pmax, W, scp: M / W, smax };
+}
+/* 平衡收敛比 k*：使合力作用点 s_cp = 支点位置 λ（由支点位置决定的定值） */
+let KSTAR = null;
+(function () {
+  const scpOf = k => { const r = solveP(k, 1, 1, 1); return r ? r.scp : null; };
+  let lo = 1.0001, hi = 30;
+  for (let i = 0; i < 46; i++) {
+    const m = (lo + hi) / 2, s = scpOf(m);
+    if (s === null) { lo = m; continue; }
+    if (s < LAM) lo = m; else hi = m;
+  }
+  KSTAR = (lo + hi) / 2;
+})();
+
+const yOf = s => dir > 0 ? Y0 + s * (Y1 - Y0) : Y1 - s * (Y1 - Y0);   // 正转：入口在上
+const hAtY = y => curH.t + (curH.b - curH.t) * (y - Y0) / (Y1 - Y0);
+const padRX = y => XC - hAtY(y) * K;
+const padLX = y => padRX(y) - 30;
+
+function targets() {
+  // 根据模式与控件求目标间隙（顶/底）
+  const U = parseFloat($('b-spd').value), eta = parseFloat($('b-vis').value) / 1000;
+  overload = false;
+  if (!auto) {
+    const t = parseFloat($('b-tilt').value) / 100;
+    return {
+      t: Math.min(0.12, Math.max(0.012, G0 + t * DMAX)),
+      b: Math.min(0.12, Math.max(0.012, G0 - t * DMAX))
+    };
+  }
+  // 自动调倾：给定载荷 W*，解平衡膜厚（k=KSTAR 定值，由支点位置决定）
+  const Wstar = parseFloat($('b-load').value) * 1000;
+  const r = solveP(KSTAR * 0.1, 0.1, U, eta);          // 试探膜厚下的承载
+  let hb = 0.1 * Math.sqrt(r.W / Wstar);               // W ∝ 1/hb²
+  if (hb < 0.015) { hb = 0.015; overload = true; }
+  hb = Math.min(hb, 0.07);
+  const ha = KSTAR * hb;
+  return dir > 0 ? { t: ha, b: hb } : { t: hb, b: ha };
+}
+
+function tweenTo(tg) {
+  if (tween) cancelAnimationFrame(tween);
+  const from = { ...curH }, t0 = performance.now(), dur = 550;
+  (function step(t) {
+    let k = Math.min(1, (t - t0) / dur);
+    k = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+    curH.t = from.t + (tg.t - from.t) * k;
+    curH.b = from.b + (tg.b - from.b) * k;
+    render();
+    if (k < 1) tween = requestAnimationFrame(step);
+  })(t0);
+}
+
+function render() {
+  const U = parseFloat($('b-spd').value), eta = parseFloat($('b-vis').value) / 1000;
+  const oil = $('b-oilChk').checked;
+  const inCls = mode === 'cls';
+  const ha = dir > 0 ? curH.t : curH.b, hb = dir > 0 ? curH.b : curH.t;
+
+  /* ---- 几何 ---- */
+  const xT = XC - curH.t * K, xB = XC - curH.b * K;
+  $('b-padPoly').setAttribute('points',
+    `${xT - 30},${Y0} ${xT},${Y0} ${xB},${Y1} ${xB - 30},${Y1}`);
+  $('b-wedge').setAttribute('points', `${XC},${Y0} ${XC},${Y1} ${xB},${Y1} ${xT},${Y0}`);
+  $('b-wedge').style.display = oil ? '' : 'none';
+  const yPiv = yOf(LAM);
+  $('b-pivotDot').setAttribute('cx', padLX(yPiv) - 8); $('b-pivotDot').setAttribute('cy', yPiv);
+  $('b-pivLine').setAttribute('y1', yPiv); $('b-pivLine').setAttribute('y2', yPiv);
+  $('b-pivLine').previousElementSibling.setAttribute('y', yPiv - 8);
+  const midY = (Y0 + Y1) / 2, midX = (padRX(midY) + padLX(midY)) / 2;
+  $('b-padLbl').setAttribute('x', midX); $('b-padLbl').setAttribute('y', midY);
+  $('b-padLbl').setAttribute('transform', `rotate(90 ${midX} ${midY})`);
+  $('b-hTopT').textContent = (dir > 0 ? '入口 h₁=' : '出口 h₂=') + curH.t.toFixed(3);
+  $('b-hBotT').textContent = (dir > 0 ? '出口 h₂=' : '入口 h₁=') + curH.b.toFixed(3);
+  const fl = $('b-flowG').querySelector('line');
+  fl.setAttribute('y1', dir > 0 ? 130 : 490); fl.setAttribute('y2', dir > 0 ? 490 : 130);
+  $('b-flowG').style.display = oil ? '' : 'none';
+  $('b-uArrow').setAttribute('y1', dir > 0 ? 180 : 300);
+  $('b-uArrow').setAttribute('y2', dir > 0 ? 300 : 180);
+  $('b-uTxt').textContent = dir > 0 ? '正转 ↻' : '反转 ↺';
+
+  /* ---- 状态 ---- */
+  const conv = ha > hb + 1e-4, divg = hb > ha + 1e-4, moving = U > 0.05;
+  const okAll = conv && moving && oil && !overload;
+  $('b-c1').className = 'cchip ' + (conv ? 'ok' : 'bad');
+  $('b-c1').textContent = '① 收敛间隙 ' + (conv ? '✓' : (divg ? '✗ 发散' : '✗ 平行'));
+  $('b-c2').className = 'cchip ' + (moving ? 'ok' : 'bad');
+  $('b-c2').textContent = '② 相对运动 ' + (moving ? '✓' : '✗');
+  $('b-c3').className = 'cchip ' + (oil ? 'ok' : 'bad');
+  $('b-c3').textContent = '③ 连续供油 ' + (oil ? '✓' : '✗');
+
+  const res = (conv && moving && oil) ? solveP(ha, hb, U, eta) : null;
+  const bal = res ? Math.abs(res.scp - LAM) < 0.015 : false;
+  if (auto)      { $('b-c5').className = 'cchip ok'; $('b-c5').textContent = '压力合力过支点 ✓ 自平衡'; }
+  else if (!res) { $('b-c5').className = 'cchip bad'; $('b-c5').textContent = '力矩：—'; }
+  else           { $('b-c5').className = 'cchip ' + (bal ? 'ok' : 'bad');
+                   $('b-c5').textContent = bal ? '力矩平衡 ✓ 瓦块稳定' : '力矩不平衡 ✗ 瓦块将绕支点摆动'; }
+  $('b-c4').className = 'cchip big ' + (okAll ? 'ok' : 'bad');
+  $('b-c4').textContent = overload ? '过载：油膜过薄 ✗' : (okAll ? '动压油膜：已形成 ✓' : '未形成有效油膜 ✗');
+
+  const ts = $('b-tiltState');
+  if (overload)     { ts.textContent = '载荷超限：油膜被压到过薄（h_min=0.015mm），瓦块托不住了！'; ts.style.fill = '#a32d2d'; }
+  else if (!oil)    { ts.textContent = '断油状态：三条件缺一，动压无从谈起'; ts.style.fill = '#a32d2d'; }
+  else if (!moving) { ts.textContent = '轴静止：没有相对运动，油膜不产生压力'; ts.style.fill = '#a32d2d'; }
+  else if (divg)    { ts.textContent = '发散间隙：油膜被“拉空”（负压），不能形成有效承载压力'; ts.style.fill = '#a32d2d'; }
+  else if (!conv)   { ts.textContent = '平行间隙：压力≈0，无法形成动压'; ts.style.fill = '#ba7517'; }
+  else if (auto)    { ts.textContent = '载荷与转速变化后，油膜压力分布改变，瓦块绕支点微量摆动，直至重新平衡'; ts.style.fill = '#185fa5'; }
+  else              { ts.textContent = bal ? '收敛楔出油膜压力，且合力通过支点——瓦块稳定' : '收敛楔出油膜压力，但合力偏离支点——瓦块将绕支点摆动找平衡'; ts.style.fill = bal ? '#185fa5' : '#ba7517'; }
+
+  /* ---- 压力曲线（垂直瓦面） ---- */
+  if (res && res.pmax > 1) {
+    const PS = 90 / res.pmax;
+    let d = '';
+    for (let i = 0; i <= N; i++) {
+      const y = yOf(i / N), x = padLX(y) - res.p[i] * PS;
+      d += (i ? ' L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1);
+    }
+    d += ` L ${padLX(Y1).toFixed(1)} ${Y1} L ${padLX(Y0).toFixed(1)} ${Y0} Z`;
+    $('b-pc').setAttribute('d', d);
+    const ym = yOf(res.smax), xm = padLX(ym) - res.pmax * PS;
+    $('b-pmaxDot').style.display = inCls ? 'none' : '';
+    $('b-pmaxDot').setAttribute('cx', xm); $('b-pmaxDot').setAttribute('cy', ym);
+    $('b-pmaxT').style.display = inCls ? 'none' : '';
+    $('b-pmaxT').setAttribute('x', xm - 10); $('b-pmaxT').setAttribute('y', ym + 5);
+    $('b-pmaxT').setAttribute('text-anchor', 'end');
+    $('b-pmaxT').textContent = 'p_max≈' + (res.pmax / 1e6).toFixed(2) + ' MPa';
+    const yc = yOf(res.scp), xs = padLX(yc) - res.p[Math.round(res.scp * N)] * PS - 14;
+    const WL = Math.min(120, Math.max(25, res.W / 1500));
+    $('b-wArrow').style.display = '';
+    $('b-wArrow').setAttribute('x1', xs); $('b-wArrow').setAttribute('y1', yc);
+    $('b-wArrow').setAttribute('x2', xs - WL); $('b-wArrow').setAttribute('y2', yc);
+    $('b-wT').style.display = inCls ? 'none' : '';
+    $('b-wT').setAttribute('x', xs - WL - 8); $('b-wT').setAttribute('y', yc + 5);
+    $('b-wT').setAttribute('text-anchor', 'end');
+    $('b-wT').textContent = 'W≈' + (res.W / 1000).toFixed(1) + ' kN/m';
+  } else {
+    $('b-pc').setAttribute('d', '');
+    $('b-pmaxDot').style.display = 'none'; $('b-pmaxT').style.display = 'none';
+    $('b-wArrow').style.display = 'none'; $('b-wT').style.display = 'none';
+  }
+
+  /* ---- 课堂模式状态横幅 ---- */
+  if (inCls) {
+    const names = { parallel:'平行端面', manual:'手动倾瓦', g1:'进一', g3:'进三', g5:'进五' };
+    $('b-cbLine1').textContent = '当前工况：' + names[preset];
+    const L2 = $('b-cbLine2'), M = $('b-cbMsg');
+    if (preset === 'parallel') {
+      L2.textContent = '入口间隙 = 出口间隙 = ' + curH.t.toFixed(3) + ' mm（平行）｜最小油膜厚度：—';
+      M.textContent = '有相对运动，也有润滑油，但缺少收敛间隙，不能形成有效承载油膜。';
+      M.style.color = '#ba7517';
+    } else if (preset === 'manual') {
+      if (conv) {
+        L2.textContent = '最小油膜厚度 h_min = ' + hb.toFixed(3) + ' mm';
+        M.textContent = bal ? '收敛间隙：油膜压力分布形成，合力通过支点——瓦块稳定承载。'
+                            : '收敛间隙：已形成压力分布，但合力偏离支点——瓦块将绕支点摆动。';
+        M.style.color = bal ? '#185fa5' : '#ba7517';
+      } else if (divg) {
+        L2.textContent = '最小油膜厚度：—（未形成有效油膜）';
+        M.textContent = '发散间隙：运动方向由小间隙指向大间隙，不能形成有效承载压力。';
+        M.style.color = '#a32d2d';
+      } else {
+        L2.textContent = '入口间隙 = 出口间隙（平行）｜最小油膜厚度：—';
+        M.textContent = '当前为平行间隙，压力≈0——请向“收敛”方向拖动滑块。';
+        M.style.color = '#ba7517';
+      }
+    } else {
+      L2.textContent = '最小油膜厚度 h_min = ' + hb.toFixed(3) + ' mm';
+      M.textContent = '工况变化后，瓦块姿态、油膜厚度和压力分布重新达到平衡。';
+      M.style.color = '#185fa5';
+    }
+  }
+
+  /* ---- 读数 ---- */
+  if (auto) {
+    $('b-readout').textContent = overload
+      ? `载荷 W*=${$('b-load').value} kN/m 超出油膜承载极限！请减小载荷或提高转速/粘度`
+      : `载荷 W*=${$('b-load').value} kN/m → 重新平衡：h_min=${hb.toFixed(3)} mm，收敛比 k=h₁/h₂≈${KSTAR.toFixed(2)}（由支点位置决定的定值），油膜厚度随工况整体缩放`;
+  } else {
+    $('b-readout').textContent = res
+      ? `入口 h₁=${ha.toFixed(3)} mm，出口 h₂=${hb.toFixed(3)} mm，k=${(ha / hb).toFixed(2)}，合力位置 s=${(res.scp).toFixed(2)}L（支点在 ${LAM}L）`
+      : `入口 h₁=${ha.toFixed(3)} mm，出口 h₂=${hb.toFixed(3)} mm`;
+  }
+  $('b-tiltV').textContent = (parseFloat($('b-tilt').value) >= 0 ? '+' : '') + (parseFloat($('b-tilt').value) / 100 * DMAX).toFixed(3) + ' mm';
+  $('b-loadV').textContent = $('b-load').value + ' kN/m';
+  $('b-spdV').textContent = U.toFixed(1) + ' m/s';
+  $('b-visV').textContent = (eta * 1000).toFixed(0) + ' mPa·s';
+  $('b-rotSym').textContent = dir > 0 ? '↻' : '↺';
+  $('b-rotTxt').textContent = dir > 0 ? '正转' : '反转';
+  /* 左图瓦块随倾角联动（绕支承销转动，方向与入口收敛一致） */
+  const cAmt = dir > 0 ? curH.t - curH.b : curH.b - curH.t;
+  const thL = -dir * cAmt * 45;
+  $('b-padU').style.transform = `rotate(${thL}deg)`;
+  $('b-padU').style.transformOrigin = '258px 182px';
+  $('b-padL').style.transform = `rotate(${thL}deg)`;
+  $('b-padL').style.transformOrigin = '258px 338px';
+  ROOT.querySelectorAll('.oilSliver').forEach(s => s.style.display = oil ? '' : 'none');
+}
+
+function refresh(animate) {
+  const tg = targets();
+  if (animate) tweenTo(tg); else { if (tween) cancelAnimationFrame(tween); curH = tg; render(); }
+}
+
+/* ================= 课堂模式：工况预设 ================= */
+function syncModeUI() {
+  $('b-modeM').classList.toggle('on', !auto);
+  $('b-modeA').classList.toggle('on', auto);
+  $('b-tilt').disabled = auto; $('b-load').disabled = !auto;
+}
+function syncDirUI() {
+  $('b-dirF').classList.toggle('on', dir > 0);
+  $('b-dirR').classList.toggle('on', dir < 0);
+}
+function setTilt(v) { $('b-tilt').value = v; $('b-tiltC').value = v; }
+
+function applyPreset(p, animate) {
+  preset = p;
+  ROOT.querySelectorAll('.pbtn[data-p]').forEach(b => b.classList.toggle('on', b.dataset.p === p));
+  $('b-classTilt').classList.toggle('on', p === 'manual');
+  dir = 1; syncDirUI();
+  $('b-oilChk').checked = true;
+  if (p === 'parallel') {
+    auto = false; setTilt(0); $('b-spd').value = 5; $('b-vis').value = 30;
+  } else if (p === 'manual') {
+    auto = false;                                   // 保留当前倾角继续探究
+  } else {
+    auto = true;                                    // 可倾瓦平衡模式（相对工况预设）
+    const P = { g1: [80, 3], g3: [300, 5], g5: [800, 7] }[p];
+    $('b-load').value = P[0]; $('b-spd').value = P[1]; $('b-vis').value = 30;
+  }
+  syncModeUI();
+  refresh(animate !== false);
+}
+ROOT.querySelectorAll('.pbtn[data-p]').forEach(b => {
+  b.onclick = () => applyPreset(b.dataset.p, true);
+});
+$('b-resetBtn').onclick = () => applyPreset('parallel', true);
+
+/* ================= 模式切换 ================= */
+function setMode(m) {
+  mode = m;
+  ROOT.classList.toggle('cls', m === 'cls');
+  ROOT.classList.toggle('exp', m !== 'cls');
+  $('b-mCls').classList.toggle('on', m === 'cls');
+  $('b-mExp').classList.toggle('on', m === 'exp');
+  if (m === 'cls') applyPreset(preset, false);
+  else refresh(false);
+  if (pinned) select(pinned);                       // 刷新零件说明长短文本
+}
+$('b-mCls').onclick = () => setMode('cls');
+$('b-mExp').onclick = () => setMode('exp');
+
+/* ================= 自主探究控件 ================= */
+$('b-tilt').oninput = () => { $('b-tiltC').value = $('b-tilt').value; refresh(false); };
+$('b-tiltC').oninput = () => { $('b-tilt').value = $('b-tiltC').value; refresh(false); };
+$('b-spd').oninput = () => refresh(auto);
+$('b-vis').oninput = () => refresh(auto);
+$('b-load').oninput = () => refresh(true);
+$('b-oilChk').onchange = () => refresh(false);
+$('b-dirF').onclick = () => { dir = 1; syncDirUI(); refresh(auto); };
+$('b-dirR').onclick = () => { dir = -1; syncDirUI(); refresh(auto); };
+$('b-modeM').onclick = () => { auto = false; syncModeUI(); refresh(false); };
+$('b-modeA').onclick = () => { auto = true; syncModeUI(); refresh(true); };
+
+applyPreset('parallel', false);
+
+})();
+</script>
+</body>
+</html>
