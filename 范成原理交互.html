@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>齿轮原理仿真 · 齿轮的加工</title>
+<style>
+  :root{
+    --bg:#faf9f5; --surface:#ffffff; --surface2:#f1efe8;
+    --text:#2c2c2a; --text2:#5f5e5a; --text3:#888780;
+    --border:rgba(0,0,0,0.12); --border2:rgba(0,0,0,0.22);
+    --success:#3b6d11; --danger:#a32d2d;
+    --info-bg:#e6f1fb; --warn-bg:#faeeda; --danger-bg:#fcebeb;
+    --base:#378add; --gear:#888780; --aux:#ba7517; --node:#1d9e75; --cut:#d4537e; --tool:#7c5cd6; --trace:#9a93c9;
+  }
+  @media(prefers-color-scheme:dark){
+    :root{--bg:#1f1e1b;--surface:#2a2926;--surface2:#33322e;
+      --text:#ecebe3;--text2:#b4b2a9;--text3:#888780;
+      --border:rgba(255,255,255,0.14);--border2:rgba(255,255,255,0.24);
+      --success:#97c459;--danger:#f09595;
+      --info-bg:#0c447c;--warn-bg:#633806;--danger-bg:#791f1f;
+      --base:#85b7eb;--gear:#b4b2a9;--aux:#ef9f27;--node:#5dcaa5;--cut:#ed93b1;--tool:#a78fe0;--trace:#6f68a8;}
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{margin:0;padding:0;font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);line-height:1.5;}
+  .app{max-width:920px;margin:0 auto;padding:16px;}
+  header{margin-bottom:12px;}
+  h1{font-size:20px;font-weight:600;margin:0 0 2px;}
+  .tagline{font-size:12px;color:var(--text2);margin:0;}
+  .tabs{display:flex;gap:6px;margin:14px 0;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px;}
+  .tab{flex:0 0 auto;padding:9px 14px;font-size:13px;border:0.5px solid var(--border2);border-radius:8px;background:var(--surface);color:var(--text2);cursor:pointer;white-space:nowrap;transition:all .15s;min-height:40px;}
+  .tab.active{background:#185fa5;color:#fff;border-color:#185fa5;font-weight:600;}
+  .panel{display:none;}
+  .panel.active{display:block;}
+  @media(min-width:760px){
+    .app{max-width:1100px;padding:24px;}
+    .panel.active{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:0 24px;align-items:start;}
+    .panel.active>.stage-card{grid-column:1;grid-row:1/99;align-self:start;position:sticky;top:16px;margin-bottom:0;}
+    .panel.active>:not(.stage-card){grid-column:2;}
+    h1{font-size:24px;}
+  }
+  .stage-card{background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:8px;margin-bottom:12px;}
+  svg{display:block;width:100%;height:auto;touch-action:none;}
+  .readouts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:12px;}
+  .metric{background:var(--surface2);border-radius:8px;padding:9px 11px;}
+  .metric .lab{font-size:11px;color:var(--text2);margin-bottom:1px;}
+  .metric .val{font-size:18px;font-weight:600;}
+  .metric .formula{font-size:10px;color:var(--text3);margin-top:1px;}
+  .note{border-radius:8px;padding:10px 13px;margin-bottom:12px;font-size:12px;line-height:1.6;background:var(--surface2);color:var(--text2);}
+  .ctrl{margin-bottom:9px;}
+  .ctrl .head{display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px;}
+  .ctrl .val{font-weight:600;font-variant-numeric:tabular-nums;}
+  input[type=range]{width:100%;height:30px;cursor:pointer;accent-color:#185fa5;margin:0;}
+  .btnrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center;}
+  button{font-family:inherit;font-size:13px;padding:9px 13px;background:var(--surface);border:0.5px solid var(--border2);border-radius:8px;cursor:pointer;color:var(--text);min-height:40px;transition:background .15s;}
+  button:active{transform:scale(0.97);}
+  button.primary{border-color:#185fa5;color:#185fa5;}
+  .seg{font-size:12px;color:var(--text2);margin-right:2px;align-self:center;}
+  .hint{font-size:12px;color:var(--text2);margin-top:10px;line-height:1.6;}
+  .verdict{border-radius:8px;padding:11px 13px;margin-bottom:12px;font-size:13px;font-weight:600;text-align:center;}
+  .verdict.ok{background:var(--info-bg);color:var(--text);}
+  .verdict.no{background:var(--danger-bg);color:var(--danger);}
+  text{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;}
+</style>
+</head>
+<body>
+<div id="wx-guide" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:9999;padding:20px;text-align:right;">
+  <div style="color:#fff;font-size:15px;line-height:1.9;margin-top:8px;">
+    <div style="font-size:34px;line-height:1;">↗</div>
+    请点击右上角 <b>···</b><br>选择「在浏览器打开」<br>即可正常使用本仿真
+  </div>
+  <button onclick="document.getElementById('wx-guide').style.display='none'" style="position:absolute;left:20px;bottom:40px;background:#fff;color:#222;border:none;padding:10px 20px;border-radius:8px;font-size:14px;">仍在微信内继续（部分功能受限）</button>
+</div>
+<div class="app">
+<header>
+  <h1>齿轮的加工 · 范成法与根切 <span style="font-size:14px;font-weight:400;color:var(--text2);">by 王晟NUE</span></h1>
+  <p class="tagline">范成原理 · 根切机理 · 根切现象 · 最少齿数 · 变位修正 · 双智驱动 图谱先行</p>
+</header>
+<div class="tabs">
+  <button class="tab" data-tab="gen">① 范成原理</button>
+  <button class="tab active" data-tab="why">② 根切的机理</button>
+  <button class="tab" data-tab="under">③ 根切与最少齿数</button>
+  <button class="tab" data-tab="shift">④ 变位避免根切</button>
+</div>
+<div class="panel" id="panel-gen"></div>
+<div class="panel active" id="panel-why"></div>
+<div class="panel" id="panel-under"></div>
+<div class="panel" id="panel-shift"></div>
+</div>
+<script>
+(function(){
+  var ua=navigator.userAgent.toLowerCase();
+  if(ua.indexOf('micromessenger')!==-1){document.getElementById('wx-guide').style.display='block';}
+})();
+const SVGNS='http://www.w3.org/2000/svg';
+function E(tag,a){const e=document.createElementNS(SVGNS,tag);for(const k in a)e.setAttribute(k,a[k]);return e;}
+function txt(p,x,y,s,size,fill,anchor,weight){const t=E('text',{x,y,'font-size':size,fill,'text-anchor':anchor||'start'});if(weight)t.setAttribute('font-weight',weight);t.textContent=s;p.appendChild(t);return t;}
+function cssv(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim();}
+
+const TABS=['gen','why','under','shift'];
+let activeTab='why';
+document.querySelectorAll('.tab').forEach(b=>{
+  b.addEventListener('click',()=>{
+    activeTab=b.dataset.tab;
+    document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t===b));
+    TABS.forEach(t=>document.getElementById('panel-'+t).classList.toggle('active',t===activeTab));
+    if(MOD[activeTab]&&MOD[activeTab].onShow)MOD[activeTab].onShow();
+  });
+});
+const MOD={};
+const ALPHA=20*Math.PI/180;
+const INVA=Math.tan(ALPHA)-ALPHA;
+
+function gearPath(rb,rf,ra,z,phi,centerOff,cxp,cyp,sc){
+  const sH=Math.PI/(2*z), base=sH+INVA;
+  const tEnd=Math.sqrt((ra/rb)*(ra/rb)-1);
+  const rSt=Math.max(rf,rb);
+  const tSt=rSt<=rb?0:Math.sqrt((rSt/rb)*(rSt/rb)-1);
+  function PT(ri,ang){return [cxp+sc*ri*Math.cos(ang), cyp-sc*ri*Math.sin(ang)];}
+  const rfr=sc*rf;
+  let d='', first=true;
+  for(let k=0;k<z;k++){
+    const c=phi+centerOff+k*2*Math.PI/z;
+    let edge=[];
+    for(let i=0;i<=12;i++){const t=tSt+(tEnd-tSt)*i/12;const ri=rb*Math.sqrt(1+t*t);const ai=Math.acos(Math.max(-1,Math.min(1,rb/ri)));const polar=base-(Math.tan(ai)-ai);edge.push([ri,polar]);}
+    const rootL=PT(rf,c-base);
+    d+=(first?'M':'L')+rootL[0].toFixed(2)+' '+rootL[1].toFixed(2)+' ';first=false;
+    for(let i=0;i<edge.length;i++){const pr=PT(edge[i][0],c-edge[i][1]);d+='L'+pr[0].toFixed(2)+' '+pr[1].toFixed(2)+' ';}
+    for(let i=edge.length-1;i>=0;i--){const pr=PT(edge[i][0],c+edge[i][1]);d+='L'+pr[0].toFixed(2)+' '+pr[1].toFixed(2)+' ';}
+    const rootR=PT(rf,c+base);d+='L'+rootR[0].toFixed(2)+' '+rootR[1].toFixed(2)+' ';
+    const nextC=phi+centerOff+(k+1)*2*Math.PI/z;
+    const nextRootL=PT(rf,nextC-base);
+    d+='A'+rfr.toFixed(2)+' '+rfr.toFixed(2)+' 0 0 0 '+nextRootL[0].toFixed(2)+' '+nextRootL[1].toFixed(2)+' ';
+  }
+  d+='Z';
+  return d;
+}
+
+// 生成齿轮齿形多边形点(用于Canvas填充/擦除)
+function gearPolygon(rb,rf,ra,z,phi,centerOff){
+  const sH=Math.PI/(2*z), base=sH+INVA;
+  const tEnd=Math.sqrt((ra/rb)*(ra/rb)-1);
+  const rSt=Math.max(rf,rb);
+  const tSt=rSt<=rb?0:Math.sqrt((rSt/rb)*(rSt/rb)-1);
+  let pts=[];
+  for(let k=0;k<z;k++){
+    const c=phi+centerOff+k*2*Math.PI/z;
+    pts.push([rf*Math.cos(c-base), rf*Math.sin(c-base)]);
+    for(let i=0;i<=8;i++){const t=tSt+(tEnd-tSt)*i/8;const ri=rb*Math.sqrt(1+t*t);const ai=Math.acos(Math.max(-1,Math.min(1,rb/ri)));const polar=base-(Math.tan(ai)-ai);pts.push([ri*Math.cos(c-polar), ri*Math.sin(c-polar)]);}
+    for(let i=8;i>=0;i--){const t=tSt+(tEnd-tSt)*i/8;const ri=rb*Math.sqrt(1+t*t);const ai=Math.acos(Math.max(-1,Math.min(1,rb/ri)));const polar=base-(Math.tan(ai)-ai);pts.push([ri*Math.cos(c+polar), ri*Math.sin(c+polar)]);}
+    pts.push([rf*Math.cos(c+base), rf*Math.sin(c+base)]);
+  }
+  return pts;
+}
+
+// 插刀齿廓多边形(刀心系,齿顶高1.25m切到齿坯齿根)
+function pinToolPoly(z0,phi0){
+  const MM=4;
+  const r0=MM*z0/2, rb0=r0*Math.cos(ALPHA), ra0=r0+1.25*MM, rf0=r0-MM;
+  const sH=Math.PI/(2*z0), base=sH+ (Math.tan(ALPHA)-ALPHA);
+  const tEnd=Math.sqrt((ra0/rb0)*(ra0/rb0)-1);
+  const tSt=rf0<=rb0?0:Math.sqrt((rf0/rb0)*(rf0/rb0)-1);
+  let pts=[];
+  for(let k=0;k<z0;k++){
+    const c=phi0+Math.PI/z0+k*2*Math.PI/z0;
+    pts.push([rf0*Math.cos(c-base), rf0*Math.sin(c-base)]);
+    for(let i=0;i<=6;i++){const t=tSt+(tEnd-tSt)*i/6;const ri=rb0*Math.sqrt(1+t*t);const ai=Math.acos(Math.max(-1,Math.min(1,rb0/ri)));const pol=base-(Math.tan(ai)-ai);pts.push([ri*Math.cos(c-pol), ri*Math.sin(c-pol)]);}
+    for(let i=6;i>=0;i--){const t=tSt+(tEnd-tSt)*i/6;const ri=rb0*Math.sqrt(1+t*t);const ai=Math.acos(Math.max(-1,Math.min(1,rb0/ri)));const pol=base-(Math.tan(ai)-ai);pts.push([ri*Math.cos(c+pol), ri*Math.sin(c+pol)]);}
+    pts.push([rf0*Math.cos(c+base), rf0*Math.sin(c+base)]);
+  }
+  return pts;
+}
+
+(function(){
+  const P=document.getElementById('panel-gen');
+  P.innerHTML=`
+  <div class="stage-card"><svg id="gn-svg" viewBox="0 0 360 380" role="img"><title>范成原理</title></svg></div>
+  <div class="note" id="gn-note">范成法的<b>展成运动</b>：圆形<b>齿轮插刀</b>(上)与<b>齿坯</b>(下)做纯滚动啮合，两者同步转动(传动比 z₀/z)。齿坯本是圆盘，插刀齿廓一刀刀切入，进刀痕迹累积，<b>包络</b>出渐开线齿——齿形从圆盘里"浮现"出来。</div>
+  <div class="ctrl"><div class="head"><span>齿坯齿数 z</span><span class="val" id="gn-z-v">—</span></div><input type="range" id="gn-z" min="14" max="26" step="1" value="20"></div>
+  <div class="btnrow"><button id="gn-play" class="primary">⏸ 暂停</button><button id="gn-reset">↺ 重新范成</button><span class="seg">插刀+齿坯 联动转</span></div>
+  <p class="hint">插刀(紫)和齿坯(蓝)都在转，纯滚动啮合。插刀齿廓切入齿坯的痕迹(淡线)累积，包络出光滑渐开线齿廓。齿是被一刀刀"包"出来的。模数 m=4。</p>`;
+
+  const svg=document.getElementById('gn-svg');
+  const cx=180, m=4;
+  let z=20, phi0=0, playing=true, traces=[];
+  const z0=12;
+
+  function geom(zz){const r=m*zz/2;return {r,rb:r*Math.cos(ALPHA),ra:r+m,rf:r-1.25*m};}
+  function pinGeom(){const r0=m*z0/2;return {r:r0,rb:r0*Math.cos(ALPHA),ra:r0+1.25*m,rf:r0-m};}
+
+  let SC, blankCy, toolCy;
+  function layout(){
+    const gB=geom(z), gT=pinGeom();
+    const a=gB.r+gT.r;
+    SC=Math.min(150/(gB.ra+gT.ra), 90/gB.ra, 1.3);
+    blankCy=370-SC*gB.ra;
+    toolCy=blankCy-SC*a;
+  }
+
+  // 插刀齿廓点(刀心系)->齿坯本体系
+  function toBody(px,py,phiB,gB,a){
+    // 固定空间:刀心在坯心正上方a. 数学系坯心原点,刀心(0,a)
+    const fx=px, fy=a+py;
+    const c=Math.cos(-phiB), s=Math.sin(-phiB);
+    return [fx*c-fy*s, fx*s+fy*c]; // 本体系数学坐标
+  }
+  // 本体系数学坐标 -> 屏幕(齿坯当前转phiB,y翻转)
+  function bodyToScreen(bx,by,phiB){
+    // 显示:本体系转回(齿坯已转phiB),即转+phiB? 用旋转组,这里返回本体系屏幕坐标
+    return [cx+SC*bx, blankCy-SC*by];
+  }
+
+  function recordTrace(){
+    const gB=geom(z), gT=pinGeom();
+    const a=gB.r+gT.r;
+    const phiB=-phi0*z0/z;
+    const poly=pinToolPoly(z0,phi0);
+    // 只记切入齿坯(半径<ra)的痕迹点
+    let seg=[];
+    poly.forEach(p=>{
+      const b=toBody(p[0],p[1],phiB,gB,a);
+      const rr=Math.hypot(b[0],b[1]);
+      if(rr<=gB.ra+0.5){seg.push(b);}
+      else{if(seg.length>1)traces.push(seg);seg=[];}
+    });
+    if(seg.length>1)traces.push(seg);
+  }
+
+  function draw(){
+    while(svg.firstChild)svg.removeChild(svg.firstChild);
+    layout();
+    const gB=geom(z), gT=pinGeom();
+    const a=gB.r+gT.r;
+    const phiB=-phi0*z0/z;
+    // 齿坯旋转组(圆盘+痕迹,随齿坯转phiB)
+    const grp=E('g',{transform:'rotate('+(-phiB*180/Math.PI).toFixed(2)+' '+cx+' '+blankCy+')'});
+    svg.appendChild(grp);
+    grp.appendChild(E('circle',{cx,cy:blankCy,r:SC*gB.ra,fill:cssv('--base'),'fill-opacity':0.13,stroke:cssv('--base'),'stroke-width':1.2,'stroke-dasharray':'3 3',opacity:0.7}));
+    grp.appendChild(E('circle',{cx,cy:blankCy,r:SC*gB.r,fill:'none',stroke:cssv('--node'),'stroke-width':0.7,'stroke-dasharray':'4 3',opacity:0.4}));
+    // 痕迹(本体系坐标->屏幕,在旋转组内跟齿坯转)
+    traces.forEach(seg=>{
+      let d='M'+(cx+SC*seg[0][0]).toFixed(1)+' '+(blankCy-SC*seg[0][1]).toFixed(1);
+      for(let j=1;j<seg.length;j++)d+=' L'+(cx+SC*seg[j][0]).toFixed(1)+' '+(blankCy-SC*seg[j][1]).toFixed(1);
+      grp.appendChild(E('path',{d,fill:'none',stroke:cssv('--trace'),'stroke-width':0.5,opacity:0.4}));
+    });
+    // 范成接近完成时,用粗线标出包络齿廓(定格成品轮廓)
+    const prog=phi0/(2*Math.PI*z/z0);
+    if(prog>0.5){
+      const gp=gearPath(gB.rb,gB.rf,gB.ra,z,0,Math.PI/2,cx,blankCy,SC);
+      grp.appendChild(E('path',{d:gp,fill:'none',stroke:cssv('--cut'),'stroke-width':2.5,'stroke-linejoin':'round','stroke-linecap':'round',opacity:Math.min(1,(prog-0.5)*2)}));
+    }
+    grp.appendChild(E('circle',{cx,cy:blankCy,r:3,fill:cssv('--text2')}));
+    // 插刀(上方,转phi0,不在旋转组)
+    const gpT=gearPath(gT.rb,gT.rf,gT.ra,z0,phi0,Math.PI/z0,cx,toolCy,SC);
+    svg.appendChild(E('path',{d:gpT,fill:cssv('--tool'),'fill-opacity':0.25,stroke:cssv('--tool'),'stroke-width':1.6,'stroke-linejoin':'round'}));
+    svg.appendChild(E('circle',{cx,cy:toolCy,r:3,fill:cssv('--text2')}));
+    // 节点P
+    svg.appendChild(E('circle',{cx,cy:blankCy-SC*gB.r,r:4,fill:cssv('--node'),stroke:cssv('--surface'),'stroke-width':1.5}));
+    txt(svg,cx,toolCy-SC*gT.ra-8,'齿轮插刀 z₀='+z0,11,cssv('--tool'),'middle',600);
+    txt(svg,cx,blankCy+SC*gB.ra+20,'齿坯 z='+z,11,cssv('--text2'),'middle',600);
+  }
+
+  function panel(){P.querySelector('#gn-z-v').textContent=z;}
+  function stepAnim(){
+    if(activeTab==='gen'&&playing){
+      phi0+=0.012;
+      recordTrace();
+      if(phi0> 2*Math.PI*z/z0){phi0=2*Math.PI*z/z0;playing=false;P.querySelector('#gn-play').textContent='▶ 播放';}
+      draw();
+    }
+    requestAnimationFrame(stepAnim);
+  }
+  function reset(){phi0=0;traces=[];playing=true;P.querySelector('#gn-play').textContent='⏸ 暂停';draw();}
+  P.querySelector('#gn-z').addEventListener('input',e=>{z=+e.target.value;reset();panel();});
+  P.querySelector('#gn-play').addEventListener('click',function(){playing=!playing;this.textContent=playing?'⏸ 暂停':'▶ 播放';});
+  P.querySelector('#gn-reset').addEventListener('click',reset);
+
+  MOD.gen={onShow:()=>{draw();panel();}};
+  reset();panel();stepAnim();
+})();
+
+(function(){
+  const P=document.getElementById('panel-why');
+  P.innerHTML=`
+  <div class="stage-card"><svg id="wy-svg" viewBox="0 0 360 712" role="img"><title>根切的机理</title></svg></div>
+  <div class="verdict" id="wy-verdict" style="display:none;">—</div>
+  <div class="readouts" id="wy-readouts" style="display:none;">
+    <div class="metric"><div class="lab">分度圆半径 r = mz/2</div><div class="val" id="wy-r">—</div><div class="formula">随齿数线性增大</div></div>
+    <div class="metric"><div class="lab">N₁ 高度（相对节点 P）</div><div class="val" id="wy-n1">—</div><div class="formula">r·sin²α，z 越小越低</div></div>
+    <div class="metric"><div class="lab">刀具齿顶线高度</div><div class="val">4.00 mm</div><div class="formula">标准刀具，固定不变</div></div>
+    <div class="metric"><div class="lab" id="wy-d-lab">过深量 δ</div><div class="val" id="wy-d">—</div><div class="formula">齿顶线高度 − N₁ 高度</div></div>
+  </div>
+  <div class="note"><b>探究任务</b>：保持刀具参数（m = 4 mm、α = 20°、ha* = 1）与刀具位置不变，<b>只改变被加工齿轮的齿数 z</b>。观察<b>刀具齿顶线</b>与<b>极限啮合点 N₁</b>（啮合线与基圆的切点）的相对位置如何变化，以及下方齿槽叠加图中<b>实际齿廓从哪里开始离开理论渐开线</b>。</div>
+  <div class="ctrl"><div class="head"><span>被加工齿轮齿数 z</span><span class="val" id="wy-z-v">—</span></div><input type="range" id="wy-z" min="6" max="42" step="1" value="20"></div>
+  <div class="btnrow"><span class="seg">快捷：</span><button data-z="20">z=20</button><button data-z="14">z=14</button><button data-z="7">z=7</button><span class="seg">（滑块可连续调节）</span></div>
+  <div class="btnrow"><button id="wy-play" class="primary">⏸ 暂停加工</button><button id="wy-show">👁 显示结论</button></div>
+  <div class="note" id="wy-concl" style="display:none;background:var(--warn-bg);font-size:13px;"><b>结论：刀具参数一定时，齿数越少，越容易发生根切。</b><br>刀具并没有变高——齿数越少，轮坯越小，极限啮合点 N₁ 越低，同一把标准刀具相对“过深”，齿顶线便会越过 N₁。此时刀顶圆角划出的<b>过渡曲线</b>会侵入本应是渐开线的区域，把齿根部分的渐开线挖掉。</div>
+  <div class="note" style="background:var(--info-bg);"><b>❓ 思考：标准齿轮不发生根切的临界齿数是多少？</b><br><span style="font-size:11px;">提示：临界状态就是“刀具齿顶线恰好通过 N₁”时的齿数。几何推导见下一页「③ 根切与最少齿数」。</span></div>
+  <p class="hint">读图：上图为范成加工过程——橙色为啮合线（过节点 P、与基圆相切），切点即极限啮合点 N₁；红线为刀具齿顶线（直线刃最高点，固定不变）；蓝色虚线为 N₁ 水平线。下图把<b>一个齿槽及两侧轮齿</b>放大，在同一坐标系中叠加：<b>灰色虚线 = 理论渐开线齿廓</b>，<b>蓝色实线 = 实际范成齿廓</b>，<b>红色区域 = 被根切挖去的材料</b>。齿顶与齿侧工作段两线<b>完全重合</b>，只有到<b>齿根附近（基圆以下）</b>才分离——分离点就是渐开线被切断的位置。齿数越少，分离点越高、齿根被挖得越深、轮齿根部越薄。</p>`;
+
+  const svg=document.getElementById('wy-svg');
+  const m=4,SINA=Math.sin(ALPHA),COSA=Math.cos(ALPHA),TANA=SINA/COSA;
+  const SC=6,X0=190,Y0=268;
+  const ha=m,hroot=1.25*m,hTip=1.25*m,pp=Math.PI*m;
+  const wTip=pp/4-ha*TANA,wRoot=pp/4+hroot*TANA;
+  const rhoA=0.38*m,cyA=hTip-rhoA,cxA=pp/4-cyA*TANA-rhoA/COSA;
+  const wHalf=yy=>yy<=ha?wRoot+(wTip-wRoot)*(yy+hroot)/(ha+hroot):cxA+Math.sqrt(Math.max(0,rhoA*rhoA-(yy-cyA)*(yy-cyA)));
+  const X=v=>X0+SC*v,Y=v=>Y0-SC*v;
+  const ZY=396,ZH=310;
+  const halo=t=>{t.setAttribute('paint-order','stroke');t.setAttribute('stroke',cssv('--surface'));t.setAttribute('stroke-width','3');t.setAttribute('stroke-linejoin','round');return t;};
+
+  let z=20,playing=true,t=0,showC=false;
+  let G=null;                      // 几何缓存
+  let gearGrp=null,rackGrp=null;   // 动画组
+
+  /* ================= 精确范成几何 =================
+     齿条刀(直线刃 + 刀顶圆角 rho=0.38m + 刀顶平面)范成直齿轮。
+     · 直线刃包络 = 渐开线；解析式经与暴力扫掠法比对，误差 < 1e-5°
+     · 刀顶圆角包络 = 过渡曲线(trochoid)
+     · 根切 = 过渡曲线越过基圆切点后侵入渐开线区域，两者交点即"分离点"
+  ==================================================*/
+  function buildGeom(z){
+    const r=m*z/2, rb=r*COSA, ra=r+m, rf=r-1.25*m;
+    const CEN=-Math.PI/2, TC=CEN+Math.PI/z, PIT=2*Math.PI/z;
+    // 直线刃包络 = 渐开线 (s: 沿啮合线到节点P的有向距离)
+    function invXY(s){
+      const phi=(s/COSA-pp/4)/r, nu=ALPHA-phi, d=s-r*SINA;
+      return [d*Math.cos(nu)+rb*Math.sin(nu), d*Math.sin(nu)-rb*Math.cos(nu)];
+    }
+    // 刀顶圆角包络 = 过渡曲线 (b: 刀具系法线角, ALPHA→PI/2)
+    function troXY(b){
+      const ct=Math.cos(b)/Math.sin(b), phi=(cyA*ct-cxA)/r;
+      const px=cyA*ct+rhoA*Math.cos(b), dy=cyA+rhoA*Math.sin(b)-r;
+      return [px*Math.cos(phi)+dy*Math.sin(phi), -px*Math.sin(phi)+dy*Math.cos(phi)];
+    }
+    const PR=p=>[Math.hypot(p[0],p[1]),Math.atan2(p[1],p[0])];
+    const XY=p=>[p[0]*Math.cos(p[1]),p[0]*Math.sin(p[1])];
+    const invAt=R=>PR(invXY(r*SINA-Math.sqrt(Math.max(0,R*R-rb*rb))));
+    const RB=Math.max(rb,rf+1e-4);          // 渐开线下限(基圆)
+    const thC=invAt(RB)[1];                 // 基圆处极角
+
+    // R 单调数组上的插值
+    function ith(arr,R){
+      const n=arr.length-1;
+      if(R<=arr[0][0])return arr[0][1];
+      if(R>=arr[n][0])return arr[n][1];
+      let lo=0,hi=n;
+      while(hi-lo>1){const mid=(lo+hi)>>1; if(arr[mid][0]<=R)lo=mid; else hi=mid;}
+      const dR=arr[hi][0]-arr[lo][0];
+      return arr[lo][1]+(arr[hi][1]-arr[lo][1])*(dR>1e-12?(R-arr[lo][0])/dR:0);
+    }
+
+    // 过渡曲线, R 由 rf 递增
+    const NTR=220, troA=[];
+    for(let i=NTR;i>=0;i--)troA.push(PR(troXY(ALPHA+(Math.PI/2-ALPHA)*i/NTR)));
+    const Rtro0=troA[troA.length-1][0];
+
+    // 齿顶圆角(二次Bezier, 外凸)
+    const tipP=invAt(ra), landHalf=Math.max(0,TC-tipP[1]);
+    const dcut=Math.min(0.14*m, 0.42*ra*landHalf), wLand=Math.min(dcut/ra,0.5*landHalf);
+    const RA1=Math.max(RB+1e-4, Math.min(ra-1e-4, ra-dcut));
+    const pA=XY(invAt(RA1)), pK=XY(tipP), pB=XY([ra,tipP[1]+wLand]);
+    function tipArc(out){
+      if(landHalf<=1e-4){out.push(tipP);return;}
+      for(let i=1;i<=10;i++){const u=i/10,w=1-u;
+        out.push(PR([w*w*pA[0]+2*w*u*pK[0]+u*u*pB[0], w*w*pA[1]+2*w*u*pK[1]+u*u*pB[1]]));}
+      for(let i=1;i<=6;i++)out.push([ra, tipP[1]+wLand+(TC-tipP[1]-wLand)*i/6]);
+    }
+
+    // ---- 理论齿廓侧面: 齿根圆角 → 径向段 → 渐开线 (R 递增) ----
+    const rFil=Math.max(0,Math.min(0.22*m, 0.45*(RB-rf)));
+    const theoF=[];
+    if(rFil>1e-3){
+      const Rc=rf+rFil, dA=Math.asin(Math.min(1,rFil/Rc)), angC=thC-dA;
+      const cX=Rc*Math.cos(angC), cY=Rc*Math.sin(angC);
+      const aS=Math.atan2(rf*Math.sin(angC)-cY, rf*Math.cos(angC)-cX);
+      const Rt=Math.sqrt(Math.max(0,Rc*Rc-rFil*rFil));
+      const aE=Math.atan2(Rt*Math.sin(thC)-cY, Rt*Math.cos(thC)-cX);
+      let da=aE-aS; while(da>Math.PI)da-=2*Math.PI; while(da<-Math.PI)da+=2*Math.PI;
+      for(let i=0;i<=18;i++){const a=aS+da*i/18;theoF.push(PR([cX+rFil*Math.cos(a), cY+rFil*Math.sin(a)]));}
+      for(let i=1;i<=8;i++)theoF.push([Rt+(RB-Rt)*i/8, thC]);
+    }else{
+      for(let i=0;i<=8;i++)theoF.push([rf+(RB-rf)*i/8, thC]);
+    }
+    for(let i=1;i<=56;i++)theoF.push(invAt(RB+(RA1-RB)*i/56));
+
+    // ---- 分离点: 过渡曲线首次越出理论齿廓(由内转外) ----
+    const TOL=1e-5;
+    const dAt=R=>ith(troA,R)-ith(theoF,R);
+    let Rsep=null,Rend=null;
+    const Rtop=Math.min(Rtro0,RA1), NS=1400;
+    let pR=Rtop,pD=dAt(Rtop);
+    for(let i=1;i<=NS;i++){
+      const R=Rtop+(rf-Rtop)*i/NS, dv=dAt(R);
+      if(Rsep===null&&pD<=TOL&&dv>TOL){
+        let a=pR,b=R;for(let k=0;k<50;k++){const mm=(a+b)/2;if(dAt(mm)>TOL)b=mm;else a=mm;}Rsep=(a+b)/2;
+      }else if(Rsep!==null&&Rend===null&&pD>TOL&&dv<=TOL){
+        let a=pR,b=R;for(let k=0;k<50;k++){const mm=(a+b)/2;if(dAt(mm)>TOL)a=mm;else b=mm;}Rend=(a+b)/2;
+      }
+      pR=R;pD=dv;
+    }
+    if(Rsep!==null&&Rend===null)Rend=rf;
+    const undercut=(Rsep!==null);
+    const Rjoin=undercut?Rsep:Rtro0;
+
+    // 最大根切深度(mm)
+    let maxCut=0;
+    if(undercut)for(let i=0;i<=120;i++){const R=Rend+(Rsep-Rend)*i/120;maxCut=Math.max(maxCut,dAt(R)*R);}
+
+    // ---- 实际齿廓侧面: 过渡曲线 → 渐开线 (R 递增) ----
+    const actF=[];
+    for(let i=0;i<troA.length;i++)if(troA[i][0]<Rjoin-1e-9)actF.push(troA[i]);
+    actF.push(invAt(Rjoin));
+    for(let i=1;i<=56;i++)actF.push(invAt(Rjoin+(RA1-Rjoin)*i/56));
+    // 可选: 把"越出理论齿廓"的偏差放大显示(两端偏差为0, 放大后仍连续)
+    const actD=actF;
+
+    // ---- 组装半齿距单元(齿槽中心 → 齿顶中心) ----
+    function assemble(flank){
+      const out=[];
+      const a0=flank[0][1];
+      for(let i=0;i<=14;i++)out.push([rf, CEN+(a0-CEN)*i/14]);   // 齿根圆弧
+      for(let i=0;i<flank.length;i++)out.push(flank[i]);
+      tipArc(out);
+      return out;
+    }
+    const act=assemble(actD), theo=assemble(theoF);
+
+    // ---- 红色根切区 ----
+    let red=null;
+    if(undercut&&Rsep-Rend>1e-4){
+      const tp=[],ap=[],NP=54;
+      for(let i=0;i<=NP;i++){const R=Rsep+(Rend-Rsep)*i/NP;tp.push([R,ith(theoF,R)]);ap.push([R,ith(actD,R)]);}
+      red=tp.concat(ap.reverse());
+    }
+
+    // ---- 拼接为整齿 / 全齿轮 / 局部图 ----
+    const mir=(a,ax)=>a.map(p=>[p[0],2*ax-p[1]]);
+    const shift=(a,d)=>a.map(p=>[p[0],p[1]+d]);
+    const toothA=act.concat(mir(act,TC).reverse());
+    const toothT=theo.concat(mir(theo,TC).reverse());
+    let full=[];
+    for(let k=0;k<z;k++)full=full.concat(shift(toothA,k*PIT));
+    const localAct=shift(toothA,-PIT).concat(toothA);
+    const localTheo=shift(toothT,-PIT).concat(toothT);
+    return {z,r,rb,ra,rf,CEN,TC,PIT,undercut,Rsep,Rend,maxCut,
+            sepAng:undercut?ith(theoF,Rsep):0, act,theo,red,full,localAct,localTheo,
+            delta:ha-r*SINA*SINA};
+  }
+
+  /* ---------- 路径工具 ---------- */
+  function dOf(pts,MX,MY){
+    let d='';
+    for(let i=0;i<pts.length;i++){
+      const x=MX(pts[i][0]*Math.cos(pts[i][1])), y=MY(pts[i][0]*Math.sin(pts[i][1]));
+      d+=(i?'L':'M')+x.toFixed(2)+' '+y.toFixed(2)+' ';
+    }
+    return d;
+  }
+
+  /* ---------- 齿条刀(画一次, 靠 translate 动) ---------- */
+  function rack(parent,MX,MY,xa,xb,yBody,kmin,kmax){
+    parent.appendChild(E('rect',{x:MX(xa),y:MY(-hroot),width:MX(xb)-MX(xa),height:MY(yBody)-MY(-hroot),fill:cssv('--tool'),'fill-opacity':0.16,stroke:cssv('--tool'),'stroke-width':1}));
+    for(let k=kmin;k<=kmax;k++){
+      const xc=k*pp;
+      let d='M'+MX(xc-wRoot).toFixed(1)+' '+MY(-hroot).toFixed(1)+' L'+MX(xc-wTip).toFixed(1)+' '+MY(ha).toFixed(1);
+      for(let s=1;s<=5;s++){const yy=ha+(hTip-ha)*s/5;d+=' L'+MX(xc-wHalf(yy)).toFixed(1)+' '+MY(yy).toFixed(1);}
+      d+=' L'+MX(xc+cxA).toFixed(1)+' '+MY(hTip).toFixed(1);
+      for(let s=4;s>=1;s--){const yy=ha+(hTip-ha)*s/5;d+=' L'+MX(xc+wHalf(yy)).toFixed(1)+' '+MY(yy).toFixed(1);}
+      d+=' L'+MX(xc+wTip).toFixed(1)+' '+MY(ha).toFixed(1)+' L'+MX(xc+wRoot).toFixed(1)+' '+MY(-hroot).toFixed(1)+' Z';
+      parent.appendChild(E('path',{d,fill:cssv('--tool'),'fill-opacity':0.16,stroke:cssv('--tool'),'stroke-width':1}));
+    }
+  }
+
+  /* ================= 重建(仅在 z 变化时) ================= */
+  function rebuild(){
+    while(svg.firstChild)svg.removeChild(svg.firstChild);
+    G=buildGeom(z);
+    const {r,rb,ra,rf,CEN,PIT}=G;
+    const yN1=r*SINA*SINA,xN1=-r*SINA*COSA,xK=-ha/TANA;
+    const diff=G.delta;
+    const state=diff>0.4?'over':(Math.abs(diff)<=0.4?'near':'under');
+    const gcY=Y(r);
+
+    /* ---------- 主视图 ---------- */
+    rackGrp=E('g',{});svg.appendChild(rackGrp);
+    rack(rackGrp,X,Y,-40,38,-13,-7,7);
+    svg.appendChild(E('line',{x1:X(-32),y1:Y(0),x2:X(30),y2:Y(0),stroke:cssv('--text3'),'stroke-width':0.8,'stroke-dasharray':'4 3'}));
+    halo(txt(svg,352,Y(0)+13,'节线（与分度圆纯滚动）',8,cssv('--text3'),'end'));
+    if(state==='over')svg.appendChild(E('rect',{x:X(-32),y:Y(ha),width:X(30)-X(-32),height:Y(yN1)-Y(ha),fill:cssv('--danger'),opacity:0.20}));
+    svg.appendChild(E('line',{x1:X(-32),y1:Y(ha),x2:X(30),y2:Y(ha),stroke:cssv('--danger'),'stroke-width':2}));
+    halo(txt(svg,10,Y(ha)-5,'刀具齿顶线（ha·m，固定不变）',9,cssv('--danger'),'start',600));
+
+    // 齿坯: 真实范成齿廓
+    gearGrp=E('g',{});svg.appendChild(gearGrp);
+    const MX=v=>X0+SC*v, MY=v=>gcY-SC*v;
+    let dFull=dOf(G.full,MX,MY)+'Z';
+    gearGrp.appendChild(E('path',{d:dFull,fill:cssv('--base'),'fill-opacity':0.10,stroke:cssv('--base'),'stroke-width':1.5,'stroke-linejoin':'round'}));
+    if(G.red){
+      let dr='';
+      for(let k=0;k<z;k++){
+        const rp=G.red.map(p=>[p[0],p[1]+k*PIT]);
+        dr+=dOf(rp,MX,MY)+'Z';
+        const rm=G.red.map(p=>[p[0],2*CEN-p[1]+k*PIT]);
+        dr+=dOf(rm,MX,MY)+'Z';
+      }
+      gearGrp.appendChild(E('path',{d:dr,fill:cssv('--danger'),opacity:0.42}));
+    }
+    gearGrp.appendChild(E('circle',{cx:X0,cy:gcY,r:SC*r,fill:'none',stroke:cssv('--node'),'stroke-width':0.9,'stroke-dasharray':'5 3',opacity:0.6}));
+    gearGrp.appendChild(E('circle',{cx:X0,cy:gcY,r:SC*rb,fill:'none',stroke:cssv('--cut'),'stroke-width':0.9,'stroke-dasharray':'4 2 1 2',opacity:0.65}));
+
+    if(gcY>25){svg.appendChild(E('circle',{cx:X0,cy:gcY,r:2.5,fill:cssv('--text2')}));halo(txt(svg,X0+7,gcY+4,'O',10,cssv('--text2'),'start',600));}
+    svg.appendChild(E('line',{x1:X0,y1:gcY,x2:X(xN1),y2:Y(yN1),stroke:cssv('--trace'),'stroke-width':1,'stroke-dasharray':'2 2'}));
+    const tEnd=Math.max(r*SINA,ha/SINA)+3;
+    svg.appendChild(E('line',{x1:X0,y1:Y0,x2:X0-SC*tEnd*COSA,y2:Y0-SC*tEnd*SINA,stroke:cssv('--aux'),'stroke-width':1.8}));
+    svg.appendChild(E('line',{x1:X(xN1),y1:Y(yN1),x2:X(30),y2:Y(yN1),stroke:cssv('--base'),'stroke-width':1,'stroke-dasharray':'2 2'}));
+    const n1LabY=Math.abs(Y(yN1)-Y(ha))<14?Y(yN1)+12:Y(yN1)-4;
+    halo(txt(svg,10,n1LabY,'N₁ 水平线',8.5,cssv('--base'),'start',600));
+    svg.appendChild(E('circle',{cx:X0,cy:Y0,r:4,fill:cssv('--node'),stroke:cssv('--surface'),'stroke-width':1.2}));
+    halo(txt(svg,X0+10,Y0-2,'P（节点）',9,cssv('--node'),'start',600));
+    svg.appendChild(E('circle',{cx:X(xN1),cy:Y(yN1),r:4.5,fill:cssv('--base'),stroke:cssv('--surface'),'stroke-width':1.2}));
+    halo(txt(svg,X(xN1)-8,Math.abs(Y(yN1)-Y(ha))<14?Y(yN1)+14:Y(yN1)+4,'N₁',10.5,cssv('--base'),'end',700));
+    if(state==='over'){
+      svg.appendChild(E('line',{x1:X(xK),y1:Y(yN1),x2:X(xK),y2:Y(ha),stroke:cssv('--danger'),'stroke-width':1.6}));
+      svg.appendChild(E('circle',{cx:X(xK),cy:Y(ha),r:3.2,fill:cssv('--danger')}));
+      if(SC*diff>11)halo(txt(svg,X(xK)+7,(Y(ha)+Y(yN1))/2+3,'δ='+diff.toFixed(2)+'mm',9,cssv('--danger'),'start',700));
+    }
+    let ly=20;
+    [['实际范成齿廓','--base',''],['分度圆','--node','5 3'],['基圆','--cut','4 2 1 2'],['啮合线','--aux','']].forEach(([lab,col,dash])=>{
+      const ln=E('line',{x1:12,y1:ly,x2:34,y2:ly,stroke:cssv(col),'stroke-width':2});
+      if(dash)ln.setAttribute('stroke-dasharray',dash);
+      svg.appendChild(ln);halo(txt(svg,40,ly+3.5,lab,8.5,cssv('--text'),'start',600));ly+=16;
+    });
+    const stxt=state==='over'?'刀具齿顶线 越过 N₁ → 根切':(state==='near'?'刀具齿顶线 恰好通过 N₁ → 临界':'刀具齿顶线 未越过 N₁ → 无根切');
+    const scol=state==='over'?cssv('--danger'):(state==='near'?cssv('--aux'):cssv('--success'));
+    halo(txt(svg,180,Y0+92,stxt,10.5,scol,'middle',700));
+    txt(svg,180,Y0+107,'同一模数 m=4 · 同一比例 · 同一把标准齿条刀具',8.5,cssv('--text2'),'middle',600);
+
+    /* ---------- 齿槽局部叠加图 ---------- */
+    svg.appendChild(E('rect',{x:4,y:ZY,width:352,height:ZH,rx:8,fill:cssv('--surface'),stroke:cssv('--border2'),'stroke-width':1}));
+    const clip=E('clipPath',{id:'wy-clip'});clip.appendChild(E('rect',{x:5,y:ZY+1,width:350,height:ZH-2,rx:8}));svg.appendChild(clip);
+    const g=E('g',{'clip-path':'url(#wy-clip)'});svg.appendChild(g);
+
+    // 自适应视窗
+    let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
+    G.localAct.concat(G.localTheo).forEach(p=>{
+      const px=p[0]*Math.cos(p[1]), py=p[0]*Math.sin(p[1]);
+      if(px<x0)x0=px;if(px>x1)x1=px;if(py<y0)y0=py;if(py>y1)y1=py;
+    });
+    const padT=56,padB=22,padX=9;
+    const bw=x1-x0||1, bh=y1-y0||1;
+    const k=Math.min((352-2*padX)/bw,(ZH-padT-padB)/bh);
+    const ox=(x0+x1)/2, oy=(y0+y1)/2;
+    const ZCX=180, ZCY=ZY+padT+(ZH-padT-padB)/2;
+    const ZX=v=>ZCX+(v-ox)*k, ZYf=v=>ZCY-(v-oy)*k;
+
+    // 参考圆弧
+    const arcSpan=1.02*PIT;
+    function refArc(R,col,dash,op,lab,labSide){
+      let d='';
+      for(let i=0;i<=60;i++){const a=CEN-arcSpan+2*arcSpan*i/60;
+        d+=(i?'L':'M')+ZX(R*Math.cos(a)).toFixed(1)+' '+ZYf(R*Math.sin(a)).toFixed(1)+' ';}
+      g.appendChild(E('path',{d,fill:'none',stroke:col,'stroke-width':1,'stroke-dasharray':dash,opacity:op}));
+    }
+    refArc(ra,cssv('--text3'),'2 3',0.45);
+    refArc(r,cssv('--node'),'5 3',0.55);
+    refArc(rb,cssv('--cut'),'4 2 1 2',0.8);
+    refArc(rf,cssv('--text3'),'3 3',0.5);
+
+    // 齿体填充(实际齿廓 + 内侧封口)
+    const body=G.localAct.slice();
+    let dBody=dOf(body,ZX,ZYf);
+    const bF=body[0], bL=body[body.length-1], yTop=ZY-60;
+    dBody+='L'+ZX(bL[0]*Math.cos(bL[1])).toFixed(2)+' '+yTop.toFixed(2)+' ';
+    dBody+='L'+ZX(bF[0]*Math.cos(bF[1])).toFixed(2)+' '+yTop.toFixed(2)+' Z';
+    g.appendChild(E('path',{d:dBody,fill:cssv('--base'),'fill-opacity':0.13,stroke:'none'}));
+
+    // 红色根切区
+    if(G.red){
+      let dr='';
+      [[-1,0],[1,0],[-1,PIT],[1,PIT],[-1,-PIT],[1,-PIT]].forEach(([sg,sh])=>{
+        const rp=G.red.map(p=>[p[0], sg>0?p[1]+sh:2*CEN-p[1]+sh]);
+        dr+=dOf(rp,ZX,ZYf)+'Z';
+      });
+      g.appendChild(E('path',{d:dr,fill:cssv('--danger'),opacity:0.40,stroke:cssv('--danger'),'stroke-width':0.7,'stroke-opacity':0.85,'stroke-linejoin':'round'}));
+    }
+    // 理论齿廓(灰虚线) + 实际齿廓(蓝实线)
+    g.appendChild(E('path',{d:dOf(G.localTheo,ZX,ZYf),fill:'none',stroke:cssv('--text2'),'stroke-width':1.7,'stroke-dasharray':'5 3','stroke-linecap':'round','stroke-linejoin':'round',opacity:0.95}));
+    g.appendChild(E('path',{d:dOf(G.localAct,ZX,ZYf),fill:'none',stroke:cssv('--base'),'stroke-width':2.6,'stroke-linecap':'round','stroke-linejoin':'round'}));
+
+    // 分离点
+    if(G.undercut){
+      [1,-1].forEach(sg=>{
+        const a=sg>0?G.sepAng:2*CEN-G.sepAng;
+        const px=ZX(G.Rsep*Math.cos(a)), py=ZYf(G.Rsep*Math.sin(a));
+        g.appendChild(E('circle',{cx:px,cy:py,r:3.6,fill:cssv('--danger'),stroke:cssv('--surface'),'stroke-width':1.2}));
+      });
+      const a=G.sepAng;
+      halo(txt(g,ZX(G.Rsep*Math.cos(a))+7,ZYf(G.Rsep*Math.sin(a))+3,'分离点',8.5,cssv('--danger'),'start',700));
+    }
+
+    // 标题与图例
+    txt(svg,14,ZY+17,'一个齿槽 + 两侧轮齿（理论/实际齿廓叠加）',9.5,cssv('--text2'),'start',700);
+    function legRow(yy,items){
+      let lx=14;
+      items.forEach(it=>{
+        if(it.swatch){
+          svg.appendChild(E('rect',{x:lx,y:yy-4.5,width:15,height:9,fill:it.col,opacity:0.40,stroke:it.col,'stroke-width':0.7,'stroke-opacity':0.85}));
+        }else{
+          const ln=E('line',{x1:lx,y1:yy,x2:lx+17,y2:yy,stroke:it.col,'stroke-width':it.w||2});
+          if(it.dash)ln.setAttribute('stroke-dasharray',it.dash);
+          svg.appendChild(ln);
+        }
+        txt(svg,lx+21,yy+3,it.lab,7.6,cssv('--text'),'start',600);
+        lx+=21+it.lab.length*7.8+11;
+      });
+    }
+    const row1=[{lab:'理论渐开线齿廓',col:cssv('--text2'),dash:'5 3',w:1.7},
+                {lab:'实际范成齿廓',col:cssv('--base'),w:2.6}];
+    if(G.undercut)row1.push({lab:'被根切挖去',col:cssv('--danger'),swatch:1});
+    legRow(ZY+30,row1);
+    legRow(ZY+45,[{lab:'分度圆',col:cssv('--node'),dash:'5 3',w:1.2},
+                  {lab:'基圆',col:cssv('--cut'),dash:'4 2 1 2',w:1.2},
+                  {lab:'齿顶/齿根圆',col:cssv('--text3'),dash:'3 3',w:1.2}]);
+    let utxt,ucol;
+    if(!G.undercut){
+      utxt='无根切：工作段渐开线完整保留，齿根为正常过渡曲线（灰虚线为基圆以下的径向理论参考）';
+      ucol=cssv('--success');
+    }else if(G.maxCut<0.05){
+      utxt='轻微根切：最大切深仅 '+G.maxCut.toFixed(3)+' mm —— 工程上可接受，故实际最少齿数常取 14';
+      ucol=cssv('--aux');
+    }else{
+      utxt='根切：齿根被挖去，最大切深 '+G.maxCut.toFixed(3)+' mm（分离半径 R='+G.Rsep.toFixed(2)+'mm，基圆 R='+rb.toFixed(2)+'mm）';
+      ucol=cssv('--danger');
+    }
+    txt(svg,180,ZY+ZH-9,utxt,8.5,ucol,'middle',600);
+  }
+
+  /* ================= 每帧只更新变换 ================= */
+  function tick(){
+    if(!G)return;
+    const dx=0.5*pp*Math.sin(t), phi=dx/G.r;
+    if(rackGrp)rackGrp.setAttribute('transform','translate('+(SC*dx).toFixed(2)+' 0)');
+    if(gearGrp)gearGrp.setAttribute('transform','rotate('+(-phi*180/Math.PI).toFixed(3)+' '+X0+' '+Y(G.r).toFixed(2)+')');
+  }
+
+  function panel(){
+    P.querySelector('#wy-z-v').textContent=z;
+    const r=m*z/2,yN1=r*SINA*SINA,diff=m-yN1;
+    P.querySelector('#wy-r').textContent=r.toFixed(1)+' mm';
+    P.querySelector('#wy-n1').textContent=yN1.toFixed(2)+' mm';
+    const dl=P.querySelector('#wy-d-lab'),dv=P.querySelector('#wy-d'),vd=P.querySelector('#wy-verdict');
+    vd.style.background='';vd.style.color='';
+    if(diff>0.4){
+      dl.textContent='过深量 δ';dv.textContent=diff.toFixed(2)+' mm';dv.style.color='var(--danger)';
+      vd.className='verdict no';vd.textContent='z = '+z+'：齿顶线已越过 N₁，过深 δ≈'+diff.toFixed(2)+' mm → 根切';
+    }else if(Math.abs(diff)<=0.4){
+      dl.textContent='过深量 δ';dv.textContent='≈ 0';dv.style.color='var(--aux)';
+      vd.className='verdict';vd.style.background='var(--warn-bg)';vd.style.color='var(--text)';
+      vd.textContent='z = '+z+'：齿顶线恰好通过 N₁ —— 临界状态';
+    }else{
+      dl.textContent='安全余量';dv.textContent=(-diff).toFixed(2)+' mm';dv.style.color='var(--success)';
+      vd.className='verdict ok';vd.textContent='z = '+z+'：齿顶线未越过 N₁（余量 '+(-diff).toFixed(2)+' mm）→ 正常切齿';
+    }
+  }
+  function setZ(v){z=v;rebuild();tick();panel();}
+  P.querySelector('#wy-z').addEventListener('input',e=>setZ(+e.target.value));
+  P.querySelectorAll('[data-z]').forEach(b=>b.addEventListener('click',()=>{P.querySelector('#wy-z').value=b.dataset.z;setZ(+b.dataset.z);}));
+  P.querySelector('#wy-play').addEventListener('click',function(){playing=!playing;this.textContent=playing?'⏸ 暂停加工':'▶ 继续加工';});
+  P.querySelector('#wy-show').addEventListener('click',function(){
+    showC=!showC;
+    this.textContent=showC?'🙈 隐藏结论（回到探究）':'👁 显示结论';
+    P.querySelector('#wy-verdict').style.display=showC?'':'none';
+    P.querySelector('#wy-readouts').style.display=showC?'':'none';
+    P.querySelector('#wy-concl').style.display=showC?'':'none';
+  });
+  function stepAnim(){if(activeTab==='why'&&playing){t+=0.03;tick();}requestAnimationFrame(stepAnim);}
+
+  MOD.why={onShow:()=>{rebuild();tick();panel();}};
+  rebuild();tick();panel();stepAnim();
+})();
+
+(function(){
+  const P=document.getElementById('panel-under');
+  P.innerHTML=`
+  <div class="stage-card"><svg id="uc-svg" viewBox="0 0 360 380" role="img"><title>根切现象</title></svg></div>
+  <div class="verdict" id="uc-verdict">—</div>
+  <div class="note">齿数太少时，<b>插刀齿顶</b>会切入齿坯<b>基圆以内</b>，把齿根的渐开线<b>挖掉一块</b>，这就是<b>根切</b>。根切会削弱齿根强度、降低重合度。临界齿数叫<b>最少齿数 z_min</b>。</div>
+  <div class="ctrl"><div class="head"><span>齿坯齿数 z</span><span class="val" id="uc-z-v">—</span></div><input type="range" id="uc-z" min="10" max="25" step="1" value="12"></div>
+  <div class="btnrow"><button id="uc-play" class="primary">⏸ 暂停</button><button id="uc-reset">↺ 重新范成</button><span class="seg">红色=根切被挖区 · 可拖动旋转</span></div>
+  <div class="note" style="background:var(--warn-bg);">
+    <b>最少齿数 z_min = 2/sin²α</b>　(标准直齿轮，压力角α=20°)<br>
+    = 2 / sin²20° = 2 / 0.117 ≈ <b>17.1 → 取 17</b><br>
+    <span style="font-size:11px;">说明：理论标准取 z_min=17。实际上 z=14~16 时根切轻微，工程上常可接受；z&lt;14 根切才明显、齿根明显削弱。本模块按理论值 17 为界演示。</span>
+  </div>
+  <p class="hint">拖动齿数：z≥17 不根切，齿根完整；z&lt;17 插刀齿顶切入基圆内，齿根渐开线被挖（红色区），齿变"瘦"。z 越小根切越严重。</p>`;
+
+  const svg=document.getElementById('uc-svg');
+  const cx=180, m=4;
+  let z=12, phi0=0, playing=true, traces=[], undercutPts=[];
+  let zoom=1.35, dragAngle=0, dragging=false, lastA=0;
+  const z0=12;
+  const zmin=2/(Math.sin(ALPHA)*Math.sin(ALPHA));
+
+  function geom(zz){const r=m*zz/2;return {r,rb:r*Math.cos(ALPHA),ra:r+m,rf:r-1.25*m};}
+  function pinGeom(){const r0=m*z0/2;return {r:r0,rb:r0*Math.cos(ALPHA),ra:r0+1.25*m,rf:r0-m};}
+
+  let SC, blankCy, toolCy;
+  function layout(){
+    const gB=geom(z), gT=pinGeom();
+    const a=gB.r+gT.r;
+    SC=Math.min(150/(gB.ra+gT.ra), 90/gB.ra, 1.4)*zoom;
+    blankCy=370-SC*gB.ra;
+    toolCy=blankCy-SC*a;
+  }
+  function toBody(px,py,phiB,a){
+    const fx=px, fy=a+py;
+    const c=Math.cos(-phiB), s=Math.sin(-phiB);
+    return [fx*c-fy*s, fx*s+fy*c];
+  }
+  function recordTrace(){
+    const gB=geom(z), gT=pinGeom();
+    const a=gB.r+gT.r;
+    const phiB=-phi0*z0/z;
+    const poly=pinToolPoly(z0,phi0);
+    let seg=[];
+    poly.forEach(p=>{
+      const b=toBody(p[0],p[1],phiB,a);
+      const rr=Math.hypot(b[0],b[1]);
+      if(rr<=gB.ra+0.5){
+        seg.push(b);
+        // 根切检测:痕迹切入基圆以内(rr<rb)记为根切区
+        // 根切只在z<zmin时发生:切入基圆内一定深度才算(避免正常齿根误判)
+        if(z<17 && rr<gB.rb-0.8)undercutPts.push(b);
+      } else {if(seg.length>1)traces.push(seg);seg=[];}
+    });
+    if(seg.length>1)traces.push(seg);
+  }
+  function draw(){
+    while(svg.firstChild)svg.removeChild(svg.firstChild);
+    layout();
+    const gB=geom(z), gT=pinGeom();
+    const a=gB.r+gT.r;
+    const phiB=-phi0*z0/z;
+    const grp=E('g',{transform:'rotate('+(-phiB*180/Math.PI+dragAngle).toFixed(2)+" "+cx+" "+blankCy+')'});
+    svg.appendChild(grp);
+    grp.appendChild(E('circle',{cx,cy:blankCy,r:SC*gB.ra,fill:cssv('--base'),'fill-opacity':0.13,stroke:cssv('--base'),'stroke-width':1.2,'stroke-dasharray':'3 3',opacity:0.7}));
+    // 基圆(根切的判断界线)
+    grp.appendChild(E('circle',{cx,cy:blankCy,r:SC*gB.rb,fill:'none',stroke:cssv('--cut'),'stroke-width':0.9,'stroke-dasharray':'3 2',opacity:0.6}));
+    grp.appendChild(E('circle',{cx,cy:blankCy,r:SC*gB.r,fill:'none',stroke:cssv('--node'),'stroke-width':0.7,'stroke-dasharray':'4 3',opacity:0.4}));
+    // 痕迹
+    traces.forEach(seg=>{
+      let d='M'+(cx+SC*seg[0][0]).toFixed(1)+' '+(blankCy-SC*seg[0][1]).toFixed(1);
+      for(let j=1;j<seg.length;j++)d+=' L'+(cx+SC*seg[j][0]).toFixed(1)+' '+(blankCy-SC*seg[j][1]).toFixed(1);
+      grp.appendChild(E('path',{d,fill:'none',stroke:cssv('--trace'),'stroke-width':0.5,opacity:0.4}));
+    });
+    // 根切区(红点高亮)
+    undercutPts.forEach(p=>{
+      grp.appendChild(E('circle',{cx:cx+SC*p[0],cy:blankCy-SC*p[1],r:1.6,fill:cssv('--danger'),opacity:0.7}));
+    });
+    // 完成度高时画轮廓
+    const prog=phi0/(2*Math.PI*z/z0);
+    if(prog>0.5){
+      const gp=gearPath(gB.rb,gB.rf,gB.ra,z,0,Math.PI/2,cx,blankCy,SC);
+      grp.appendChild(E('path',{d:gp,fill:'none',stroke:cssv('--cut'),'stroke-width':2,'stroke-linejoin':'round','stroke-linecap':'round',opacity:Math.min(1,(prog-0.5)*2)}));
+    }
+    grp.appendChild(E('circle',{cx,cy:blankCy,r:3,fill:cssv('--text2')}));
+    // 插刀
+    const gpT=gearPath(gT.rb,gT.rf,gT.ra,z0,phi0,Math.PI/z0,cx,toolCy,SC);
+    svg.appendChild(E('path',{d:gpT,fill:cssv('--tool'),'fill-opacity':0.25,stroke:cssv('--tool'),'stroke-width':1.6,'stroke-linejoin':'round'}));
+    svg.appendChild(E('circle',{cx,cy:toolCy,r:3,fill:cssv('--text2')}));
+    svg.appendChild(E('circle',{cx,cy:blankCy-SC*gB.r,r:4,fill:cssv('--node'),stroke:cssv('--surface'),'stroke-width':1.5}));
+    txt(svg,cx,toolCy-SC*gT.ra-8,'齿轮插刀 z₀='+z0,11,cssv('--tool'),'middle',600);
+    txt(svg,cx,blankCy+SC*gB.ra+20,'齿坯 z='+z+'（基圆=粉色虚线）',11,cssv('--text2'),'middle',600);
+  }
+  function updateVerdict(){
+    const vd=P.querySelector('#uc-verdict');
+    if(z>=17){vd.className='verdict ok';vd.textContent='z = '+z+' ≥ 17：不根切，齿根完整 ✓';}
+    else{
+      let extra = (z>=14)?'（理论根切，但较轻微）':'（根切明显）';
+      vd.className='verdict no';vd.textContent='z = '+z+' < 17：发生根切 '+extra;
+    }
+  }
+  function panel(){P.querySelector('#uc-z-v').textContent=z;updateVerdict();}
+  function stepAnim(){
+    if(activeTab==='under'&&playing){
+      phi0+=0.012;
+      recordTrace();
+      if(phi0>2*Math.PI*z/z0){phi0=2*Math.PI*z/z0;playing=false;P.querySelector('#uc-play').textContent='▶ 播放';}
+      draw();
+    }
+    requestAnimationFrame(stepAnim);
+  }
+  function reset(){phi0=0;traces=[];undercutPts=[];playing=true;P.querySelector('#uc-play').textContent='⏸ 暂停';draw();}
+  P.querySelector('#uc-z').addEventListener('input',e=>{z=+e.target.value;reset();panel();});
+  P.querySelector('#uc-play').addEventListener('click',function(){playing=!playing;this.textContent=playing?'⏸ 暂停':'▶ 播放';});
+  P.querySelector('#uc-reset').addEventListener('click',reset);
+  function angAt(ev){const rect=svg.getBoundingClientRect();const sx=(ev.touches?ev.touches[0].clientX:ev.clientX)-rect.left;const sy=(ev.touches?ev.touches[0].clientY:ev.clientY)-rect.top;const vx=sx/rect.width*360-cx;const vy=sy/rect.height*380-blankCy;return Math.atan2(vy,vx)*180/Math.PI;}
+  svg.addEventListener('pointerdown',e=>{dragging=true;lastA=angAt(e);svg.setPointerCapture(e.pointerId);});
+  svg.addEventListener('pointermove',e=>{if(!dragging)return;const a=angAt(e);dragAngle+=(a-lastA);lastA=a;draw();});
+  svg.addEventListener('pointerup',e=>{dragging=false;});
+  svg.addEventListener('pointercancel',e=>{dragging=false;});
+
+  MOD.under={onShow:()=>{reset();panel();}};
+  panel();stepAnim();
+})();
+
+(function(){
+  const P=document.getElementById('panel-shift');
+  P.innerHTML=`
+  <div class="stage-card"><svg id="sh-svg" viewBox="0 0 360 380" role="img"><title>变位齿轮</title></svg></div>
+  <div class="btnrow" style="margin-bottom:10px;">
+    <span class="seg">视图：</span>
+    <button id="sh-vmake" class="primary">范成加工</button>
+    <button id="sh-vcmp">齿廓对比</button>
+  </div>
+  <div class="note" id="sh-stdnote" style="background:var(--warn-bg);display:none;">
+    <b>齿廓对比</b>：保持齿数与刀具参数不变，只改变齿条刀具相对齿坯的径向位置。观察齿厚、齿根以及根切区域如何变化。
+  </div>
+  <div class="verdict" id="sh-verdict">—</div>
+  <div class="note">保持齿数和刀具参数不变，只调整齿条刀具相对齿坯的径向位置。观察加工过程中根切区域如何变化，并尝试找出能够避免根切的位置。</div>
+  <div class="ctrl"><div class="head"><span>齿坯齿数 z</span><span class="val" id="sh-z-v">—</span></div><input type="range" id="sh-z" min="10" max="20" step="1" value="12"></div>
+  <div class="ctrl"><div class="head"><span>齿条刀具径向位置（拖动探索）</span><span class="val" id="sh-x-v"></span></div><input type="range" id="sh-x" min="-0.6" max="0.8" step="0.05" value="0"></div>
+  <div class="btnrow"><button id="sh-play" class="primary">⏸ 暂停</button></div>
+  <div class="btnrow"><span class="seg">红=根切区 · 可拖动旋转</span></div>
+  <p class="hint">保持齿数和刀具参数不变，拖动刀具径向位置，观察红色根切区、齿根形状和加工结果的变化。先探索，再结合课堂讨论归纳变位修正的作用。</p>`;
+
+  const svg=document.getElementById('sh-svg');
+  const cx=180, m=4;
+  let z=12, x=0, phi0=0, playing=true, traces=[], undercutPts=[], showStd=false;
+  let zoom=1.35, dragAngle=0, dragging=false, lastA=0, view='make';
+  const z0=12;
+
+  function geom(zz,xx){const r=m*zz/2;return {r,rb:r*Math.cos(ALPHA),ra:r+(1+(xx||0))*m,rf:r-(1.25-(xx||0))*m};}
+  function pinGeom(){const r0=m*z0/2;return {r:r0,rb:r0*Math.cos(ALPHA),ra:r0+1.25*m,rf:r0-m};}
+
+  let SC, blankCy, toolCy, toolA;
+  function layout(){
+    const gB=geom(z,x), gT=pinGeom();
+    const a=gB.r+gT.r; // 节圆中心距(不变)
+    toolA=a + x*m; // 插刀实际径向位置:正变位远离xm
+    SC=Math.min(150/(gB.r+gT.ra+Math.abs(x)*m+m), 88/(gB.r+m*1.5), 1.4)*zoom;
+    blankCy=372-SC*(gB.r+1.5*m);
+    toolCy=blankCy-SC*toolA;
+  }
+  function toBody(px,py,phiB,a){
+    const fx=px, fy=a+py;
+    const c=Math.cos(-phiB), s=Math.sin(-phiB);
+    return [fx*c-fy*s, fx*s+fy*c];
+  }
+  function recordTrace(){
+    const gB=geom(z,x), gT=pinGeom();
+    const phiB=-phi0*z0/z;
+    const poly=pinToolPoly(z0,phi0);
+    let seg=[];
+    poly.forEach(p=>{
+      const b=toBody(p[0],p[1],phiB,toolA); // 用变位后的刀位toolA
+      const rr=Math.hypot(b[0],b[1]);
+      if(rr<=gB.r+1.5*m+0.5){
+        seg.push(b);
+        // 根切:切入基圆内一定深度(变位后根切阈值随x变化)
+        const ucThresh = gB.rb-0.8 - x*m*1.5; // 正变位提高门槛(更难根切)
+        if(rr<ucThresh && rr<gB.rb-0.3)undercutPts.push(b);
+      } else {if(seg.length>1)traces.push(seg);seg=[];}
+    });
+    if(seg.length>1)traces.push(seg);
+  }
+  // 齿廓对比图:右刃共线(同一渐开线),左刃按齿厚分开,齿顶/齿根圆,齿根圆角
+  function drawCompare(){
+    while(svg.firstChild)svg.removeChild(svg.firstChild);
+    const r=m*z/2, rb=r*Math.cos(ALPHA);
+    function invAngR(rr){const rc=Math.max(rr,rb);const ai=Math.acos(Math.max(-1,Math.min(1,rb/rc)));return Math.tan(ai)-ai;}
+    const cen=Math.PI/2;
+    // 右刃:极角 = cen + invAng(rr) (三段共用同一条渐开线,与变位无关 => 右刃重合)
+    function R(rr){const ang=cen + invAngR(rr);return [rr*Math.cos(ang),rr*Math.sin(ang)];}
+    // 左刃:镜像,关于齿中心(cen+psi_b). 左刃极角 = cen + 2*psi_b - invAng(rr)
+    function L(rr,psi_b){const ang=cen + 2*psi_b - invAngR(rr);return [rr*Math.cos(ang),rr*Math.sin(ang)];}
+
+    // 变位系数用较小值±0.3,避免畸变
+    const cases=[[-0.3,cssv('--base'),'负变位（齿薄）'],[0,cssv('--text3'),'标准齿轮'],[0.3,cssv('--danger'),'正变位（齿厚）']];
+    const segData=cases.map(([xx])=>{
+      const ra=r+(1+xx)*m, rf=r-(1.25-xx)*m;
+      const psi_b=(Math.PI/2 + 2*xx*Math.tan(ALPHA))/z + INVA;
+      return {ra,rf,psi_b};
+    });
+    // 包围盒
+    let pts=[];
+    segData.forEach(sd=>{const rStart=Math.max(sd.rf,rb);for(let rr=rStart;rr<=sd.ra;rr+=0.3){pts.push(R(rr));pts.push(L(rr,sd.psi_b));}
+      const aR=cen+invAngR(rb),aL=cen+2*sd.psi_b-invAngR(rb);pts.push([sd.rf*Math.cos(aR),sd.rf*Math.sin(aR)]);pts.push([sd.rf*Math.cos(aL),sd.rf*Math.sin(aL)]);});
+    const rMax=Math.max(...segData.map(s=>s.ra));
+    for(let a=cen-0.6;a<=cen+0.6;a+=0.1)pts.push([rMax*Math.cos(a),rMax*Math.sin(a)]);
+    let xmin=1e9,xmax=-1e9,ymin=1e9,ymax=-1e9;
+    pts.forEach(p=>{xmin=Math.min(xmin,p[0]);xmax=Math.max(xmax,p[0]);ymin=Math.min(ymin,p[1]);ymax=Math.max(ymax,p[1]);});
+    const bw=xmax-xmin||1, bh=ymax-ymin||1, bcx=(xmin+xmax)/2, bcy=(ymin+ymax)/2;
+    const fit=Math.min(285/bw, 220/bh)*0.9*zoom;
+    const scx=175, scy=232;
+    function MP(p){return [scx+(p[0]-bcx)*fit, scy-(p[1]-bcy)*fit];}
+    function arc(rr,color,dash,op,sw){let d='';for(let a=cen-0.6;a<=cen+0.6;a+=0.03){const q=MP([rr*Math.cos(a),rr*Math.sin(a)]);d+=(d===''?'M':'L')+q[0].toFixed(1)+' '+q[1].toFixed(1)+' ';}svg.appendChild(E('path',{d,fill:'none',stroke:color,'stroke-width':sw||1,'stroke-dasharray':dash,opacity:op}));}
+    // 分度圆(绿)+基圆
+    arc(r,cssv('--node'),'',1,1.6);
+    arc(rb,cssv('--cut'),'4 2',0.5);
+    const rLab=MP([r*Math.cos(cen-0.6),r*Math.sin(cen-0.6)]);txt(svg,rLab[0]-4,rLab[1]+3,'分度圆(共用)',9,cssv('--node'),'end',700);
+    const rbLab=MP([rb*Math.cos(cen+0.6),rb*Math.sin(cen+0.6)]);txt(svg,rbLab[0]+4,rbLab[1]+3,'基圆',8.5,cssv('--cut'),'start',600);
+    // 三段:每段画成一条完整齿廓路径(齿根自然延伸+齿顶小倒钝)
+    cases.forEach(([xx,color,label],i)=>{
+      const sd=segData[i];
+      arc(sd.ra,color,'2 2',0.5);
+      arc(sd.rf,color,'2 2',0.5);
+      const rStart=Math.max(sd.rf,rb);
+      const rhoA=0.2*m; // 齿顶倒钝半径
+      const raCut=sd.ra-rhoA;
+      // 右刃/左刃在基圆处角度
+      const angR_rb=cen+invAngR(rb), angL_rb=cen+2*sd.psi_b-invAngR(rb);
+      // 齿根落点:渐开线起点(基圆rb处)径向向内延伸到齿根圆rf
+      const rootR=[sd.rf*Math.cos(angR_rb),sd.rf*Math.sin(angR_rb)];
+      const rootL=[sd.rf*Math.cos(angL_rb),sd.rf*Math.sin(angL_rb)];
+      // 完整路径:齿根R(径向) -> 渐开线R -> 齿顶倒钝 -> 齿顶弧 -> 齿顶倒钝 -> 渐开线L -> 齿根L(径向)
+      let d='';
+      const pRootR=MP(rootR);d='M'+pRootR[0].toFixed(1)+' '+pRootR[1].toFixed(1)+' ';
+      // 齿根径向线到渐开线起点
+      const invStartR=MP(R(rStart));d+='L'+invStartR[0].toFixed(1)+' '+invStartR[1].toFixed(1)+' ';
+      // 渐开线R 到 raCut
+      for(let rr=rStart;rr<=raCut;rr+=0.25){const q=MP(R(rr));d+='L'+q[0].toFixed(1)+' '+q[1].toFixed(1)+' ';}
+      // 齿顶倒钝R: 渐开线末 -Q-> 齿顶圆
+      const topR=MP(R(sd.ra)), topL=MP(L(sd.ra,sd.psi_b));
+      d+='Q'+topR[0].toFixed(1)+' '+topR[1].toFixed(1)+' '+topR[0].toFixed(1)+' '+topR[1].toFixed(1)+' ';
+      d+='L'+topL[0].toFixed(1)+' '+topL[1].toFixed(1)+' ';
+      // 渐开线L 下行
+      for(let rr=raCut;rr>=rStart;rr-=0.25){const q=MP(L(rr,sd.psi_b));d+='L'+q[0].toFixed(1)+' '+q[1].toFixed(1)+' ';}
+      // 齿根径向线L
+      const pRootL=MP(rootL);d+='L'+pRootL[0].toFixed(1)+' '+pRootL[1].toFixed(1)+' ';
+      svg.appendChild(E('path',{d,fill:'none',stroke:color,'stroke-width':2.6,'stroke-linejoin':'round','stroke-linecap':'round',opacity:0.95}));
+    });
+    let ly=22;
+    cases.forEach(([xx,color,label])=>{svg.appendChild(E('line',{x1:14,y1:ly,x2:32,y2:ly,stroke:color,'stroke-width':2.8}));txt(svg,38,ly+4,label,10,cssv('--text'),'start',600);ly+=17;});
+    txt(svg,175,366,'右侧渐开线共线(同一条)·左刃按齿厚张开·全齿高都2.25m·分度圆共用',8,cssv('--text2'),'middle',600);
+  }
+
+  function draw(){
+    if(view==='compare'){drawCompare();return;}
+    while(svg.firstChild)svg.removeChild(svg.firstChild);
+    layout();
+    const gB=geom(z,x), gT=pinGeom();
+    const phiB=-phi0*z0/z;
+    const grp=E('g',{transform:'rotate('+(-phiB*180/Math.PI+dragAngle).toFixed(2)+' '+cx+' '+blankCy+')'});
+    svg.appendChild(grp);
+    // 毛坯圆(变位后齿顶圆)
+    grp.appendChild(E('circle',{cx,cy:blankCy,r:SC*gB.ra,fill:cssv('--base'),'fill-opacity':0.12,stroke:cssv('--base'),'stroke-width':1,'stroke-dasharray':'3 3',opacity:0.6}));
+    grp.appendChild(E('circle',{cx,cy:blankCy,r:SC*gB.rb,fill:'none',stroke:cssv('--cut'),'stroke-width':0.9,'stroke-dasharray':'3 2',opacity:0.55}));
+    grp.appendChild(E('circle',{cx,cy:blankCy,r:SC*gB.r,fill:'none',stroke:cssv('--node'),'stroke-width':0.7,'stroke-dasharray':'4 3',opacity:0.4}));
+    // 痕迹
+    traces.forEach(seg=>{
+      let d='M'+(cx+SC*seg[0][0]).toFixed(1)+' '+(blankCy-SC*seg[0][1]).toFixed(1);
+      for(let j=1;j<seg.length;j++)d+=' L'+(cx+SC*seg[j][0]).toFixed(1)+' '+(blankCy-SC*seg[j][1]).toFixed(1);
+      grp.appendChild(E('path',{d,fill:'none',stroke:cssv('--trace'),'stroke-width':0.5,opacity:0.4}));
+    });
+    // 根切红点
+    undercutPts.forEach(p=>{grp.appendChild(E('circle',{cx:cx+SC*p[0],cy:blankCy-SC*p[1],r:1.6,fill:cssv('--danger'),opacity:0.7}));});
+    // 变位齿廓(完成度高时)
+    const prog=phi0/(2*Math.PI*z/z0);
+    if(prog>0.5){
+      const gp=gearPath(gB.rb,gB.rf,gB.ra,z,0,Math.PI/2,cx,blankCy,SC);
+      grp.appendChild(E('path',{d:gp,fill:'none',stroke:cssv('--cut'),'stroke-width':2,'stroke-linejoin':'round','stroke-linecap':'round',opacity:Math.min(1,(prog-0.5)*2)}));
+    }
+    grp.appendChild(E('circle',{cx,cy:blankCy,r:3,fill:cssv('--text2')}));
+    // 插刀(变位后位置toolA)
+    const gpT=gearPath(gT.rb,gT.rf,gT.ra,z0,phi0,Math.PI/z0,cx,toolCy,SC);
+    svg.appendChild(E('path',{d:gpT,fill:cssv('--tool'),'fill-opacity':0.25,stroke:cssv('--tool'),'stroke-width':1.6,'stroke-linejoin':'round'}));
+    svg.appendChild(E('circle',{cx,cy:toolCy,r:3,fill:cssv('--text2')}));
+    // 变位标注:刀移动方向
+    svg.appendChild(E('circle',{cx,cy:blankCy-SC*gB.r,r:4,fill:cssv('--node'),stroke:cssv('--surface'),'stroke-width':1.5}));
+    txt(svg,cx,blankCy+SC*(gB.r+1.5*m)+18,'齿坯 z='+z,11,cssv('--text2'),'middle',600);
+  }
+  function updateVerdict(){
+    const vd=P.querySelector('#sh-verdict');
+    const xmin=(17-z)/17;
+    const safe = z>=17 || x>=xmin-0.001;
+    if(safe){vd.className='verdict ok';vd.textContent='根切已消除 ✓';}
+    else{vd.className='verdict no';vd.textContent='仍有根切，请继续探索刀具位置';}
+  }
+  function panel(){P.querySelector('#sh-z-v').textContent=z;P.querySelector('#sh-x-v').textContent='';updateVerdict();}
+  function stepAnim(){
+    if(activeTab==='shift'&&playing){
+      phi0+=0.012;
+      recordTrace();
+      if(phi0>2*Math.PI*z/z0){phi0=2*Math.PI*z/z0;playing=false;P.querySelector('#sh-play').textContent='▶ 播放';}
+      draw();
+    }
+    requestAnimationFrame(stepAnim);
+  }
+  function reset(){phi0=0;traces=[];undercutPts=[];playing=true;P.querySelector('#sh-play').textContent='⏸ 暂停';draw();}
+  P.querySelector('#sh-z').addEventListener('input',e=>{z=+e.target.value;reset();panel();});
+  P.querySelector('#sh-x').addEventListener('input',e=>{x=+e.target.value;reset();panel();});
+  P.querySelector('#sh-play').addEventListener('click',function(){playing=!playing;this.textContent=playing?'⏸ 暂停':'▶ 播放';});
+  P.querySelector('#sh-vmake').addEventListener('click',function(){view='make';this.classList.add('primary');P.querySelector('#sh-vcmp').classList.remove('primary');P.querySelector('#sh-stdnote').style.display='none';draw();});
+  P.querySelector('#sh-vcmp').addEventListener('click',function(){view='compare';this.classList.add('primary');P.querySelector('#sh-vmake').classList.remove('primary');P.querySelector('#sh-stdnote').style.display='block';draw();});
+  function angAt(ev){const rect=svg.getBoundingClientRect();const sx=(ev.touches?ev.touches[0].clientX:ev.clientX)-rect.left;const sy=(ev.touches?ev.touches[0].clientY:ev.clientY)-rect.top;const vx=sx/rect.width*360-cx;const vy=sy/rect.height*380-blankCy;return Math.atan2(vy,vx)*180/Math.PI;}
+  svg.addEventListener('pointerdown',e=>{dragging=true;lastA=angAt(e);svg.setPointerCapture(e.pointerId);});
+  svg.addEventListener('pointermove',e=>{if(!dragging)return;const a=angAt(e);dragAngle+=(a-lastA);lastA=a;draw();});
+  svg.addEventListener('pointerup',e=>{dragging=false;});
+  svg.addEventListener('pointercancel',e=>{dragging=false;});
+
+  MOD.shift={onShow:()=>{reset();panel();}};
+  panel();stepAnim();
+})();
+</script>
+</body>
+</html>
