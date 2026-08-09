@@ -1,0 +1,1170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>平面四杆机构特性仿真系列</title>
+<style>
+  :root{
+    --bg:#faf9f5; --surface:#ffffff; --surface2:#f1efe8;
+    --text:#2c2c2a; --text2:#5f5e5a; --text3:#888780;
+    --border:rgba(0,0,0,0.12); --border2:rgba(0,0,0,0.22);
+    --success:#3b6d11; --danger:#a32d2d;
+    --info-bg:#e6f1fb; --warn-bg:#faeeda; --danger-bg:#fcebeb;
+    --crank:#e24b4a; --coupler:#378add; --rocker:#1d9e75; --frame:#888780;
+  }
+  @media(prefers-color-scheme:dark){
+    :root{--bg:#1f1e1b;--surface:#2a2926;--surface2:#33322e;
+      --text:#ecebe3;--text2:#b4b2a9;--text3:#888780;
+      --border:rgba(255,255,255,0.14);--border2:rgba(255,255,255,0.24);
+      --success:#97c459;--danger:#f09595;
+      --info-bg:#0c447c;--warn-bg:#633806;--danger-bg:#791f1f;}
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{margin:0;padding:0;
+    font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    background:var(--bg);color:var(--text);line-height:1.5;}
+  .app{max-width:920px;margin:0 auto;padding:16px;}
+  header{margin-bottom:12px;}
+  h1{font-size:20px;font-weight:600;margin:0 0 2px;}
+  .tagline{font-size:12px;color:var(--text2);margin:0;}
+  .tabs{display:flex;gap:6px;margin:14px 0;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px;}
+  .tab{flex:0 0 auto;padding:9px 14px;font-size:13px;border:0.5px solid var(--border2);
+    border-radius:8px;background:var(--surface);color:var(--text2);cursor:pointer;white-space:nowrap;
+    transition:all .15s;min-height:40px;}
+  .tab.active{background:#185fa5;color:#fff;border-color:#185fa5;font-weight:600;}
+  .panel{display:none;}
+  .panel.active{display:block;}
+  @media(min-width:760px){
+    .app{max-width:1100px;padding:24px;}
+    .panel.active{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:0 24px;align-items:start;grid-auto-flow:row;}
+    .panel.active>.stage-card{grid-column:1;grid-row:1/99;align-self:start;position:sticky;top:16px;margin-bottom:0;}
+    .panel.active>:not(.stage-card){grid-column:2;}
+    h1{font-size:24px;}
+  }
+  .stage-card{background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:8px;margin-bottom:12px;}
+  svg{display:block;width:100%;height:auto;touch-action:none;}
+  .readouts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:12px;}
+  .metric{background:var(--surface2);border-radius:8px;padding:9px 11px;}
+  .metric .lab{font-size:11px;color:var(--text2);margin-bottom:1px;}
+  .metric .val{font-size:18px;font-weight:600;}
+  .verdict{border-radius:8px;padding:11px 13px;margin-bottom:12px;}
+  .verdict .lab{font-size:11px;color:var(--text2);}
+  .verdict .name{font-size:18px;font-weight:600;margin-top:1px;}
+  .verdict .desc{font-size:11px;color:var(--text2);margin-top:2px;}
+  .ctrl{margin-bottom:9px;}
+  .ctrl .head{display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px;}
+  .ctrl .val{font-weight:600;font-variant-numeric:tabular-nums;}
+  input[type=range]{width:100%;height:30px;cursor:pointer;accent-color:#185fa5;margin:0;}
+  .btnrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center;}
+  button{font-family:inherit;font-size:13px;padding:9px 13px;background:var(--surface);
+    border:0.5px solid var(--border2);border-radius:8px;cursor:pointer;color:var(--text);
+    min-height:40px;transition:background .15s;}
+  button:active{transform:scale(0.97);}
+  button.primary{border-color:#185fa5;color:#185fa5;}
+  button.danger{border-color:var(--danger);color:var(--danger);}
+  .seg{font-size:12px;color:var(--text2);margin-right:2px;align-self:center;}
+  .hint{font-size:12px;color:var(--text2);margin-top:10px;line-height:1.6;}
+  .pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600;}
+  .dbtn{flex:1 1 auto;}
+  .dbtn.on{background:#185fa5;color:#fff;border-color:#185fa5;font-weight:600;}
+  .dtask{font-size:12px;color:var(--text2);padding:2px 0;line-height:1.55;}
+  .dtask.done{color:#185fa5;font-weight:600;}
+  text{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;}
+</style>
+</head>
+<body>
+<div id="wx-guide" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:9999;padding:20px;text-align:right;">
+  <div style="color:#fff;font-size:15px;line-height:1.9;margin-top:8px;">
+    <div style="font-size:34px;line-height:1;">↗</div>
+    请点击右上角 <b>···</b><br>选择「在浏览器打开」<br>即可正常使用本仿真
+  </div>
+  <button onclick="document.getElementById('wx-guide').style.display='none'" style="position:absolute;left:20px;bottom:40px;background:#fff;color:#222;border:none;padding:10px 20px;border-radius:8px;font-size:14px;">仍在微信内继续（部分功能受限）</button>
+</div>
+<div class="app">
+<header>
+  <h1>平面四杆机构特性仿真系列 <span style="font-size:14px;font-weight:400;color:var(--text2);">by 王晟NUE</span></h1>
+  <p class="tagline">拖动杆长 · 实时分析 · 手机可用 · 双智驱动 图谱先行</p>
+</header>
+
+<div class="tabs">
+  <button class="tab" data-tab="grashof">① 曲柄存在条件</button>
+  <button class="tab" data-tab="quick">② 急回特性</button>
+  <button class="tab" data-tab="trans">③ 压力角与传动角</button>
+  <button class="tab active" data-tab="dead">④ 死点位置</button>
+  <button class="tab" data-tab="coupler">⑤ 连杆曲线</button>
+</div>
+
+<div class="panel" id="panel-grashof"></div>
+<div class="panel" id="panel-quick"></div>
+<div class="panel" id="panel-trans"></div>
+<div class="panel active" id="panel-dead"></div>
+<div class="panel" id="panel-coupler"></div>
+</div>
+
+<script>
+(function(){
+  var ua=navigator.userAgent.toLowerCase();
+  if(ua.indexOf('micromessenger')!==-1){
+    document.getElementById('wx-guide').style.display='block';
+  }
+})();
+const SVGNS='http://www.w3.org/2000/svg';
+function E(tag,a){const e=document.createElementNS(SVGNS,tag);for(const k in a)e.setAttribute(k,a[k]);return e;}
+function txt(parent,x,y,s,size,fill,anchor,weight){const t=E('text',{x,y,'font-size':size,fill,'text-anchor':anchor||'start'});if(weight)t.setAttribute('font-weight',weight);t.textContent=s;parent.appendChild(t);return t;}
+function cssv(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim();}
+
+function anchoredTransform(s, ax, ay, vw, vh){
+  const tx=vw/2-ax*s, ty=vh/2-ay*s;
+  return `translate(${tx.toFixed(2)},${ty.toFixed(2)}) scale(${s.toFixed(3)})`;
+}
+function fitScale(L, cx, cy, vw, vh, pad, extraPts){
+  let minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9;
+  const Dx=cx+L.d;
+  [[cx-15,cy],[Dx+15,cy]].forEach(([x,y])=>{minX=Math.min(minX,x);maxX=Math.max(maxX,x);minY=Math.min(minY,y);maxY=Math.max(maxY,y);});
+  for(let i=0;i<360;i+=4){const p=fourBar(L,i*Math.PI/180,cx,cy);if(!p)continue;[[p.Bx,p.By],[p.Cx,p.Cy]].forEach(([x,y])=>{minX=Math.min(minX,x);maxX=Math.max(maxX,x);minY=Math.min(minY,y);maxY=Math.max(maxY,y);});}
+  if(extraPts)extraPts.forEach(p=>{if(!p)return;minX=Math.min(minX,p.x);maxX=Math.max(maxX,p.x);minY=Math.min(minY,p.y);maxY=Math.max(maxY,p.y);});
+  const w=Math.max(maxX-minX,1), h=Math.max(maxY-minY,1);
+  const halfV=Math.max(maxY-cy,cy-minY);
+  const sV=(vh/2-pad)/Math.max(halfV,1);
+  const s=Math.min((vw-2*pad)/w, sV, 1.0);
+  return {s, ax:cx+L.d/2, ay:cy, cax:(minX+maxX)/2, cay:(minY+maxY)/2};
+}
+
+const TABS=['grashof','quick','trans','dead','coupler'];
+let activeTab='dead';
+try{const q=new URLSearchParams(location.search).get('tab');if(q&&TABS.indexOf(q)>-1)activeTab=q;}catch(e){}
+document.querySelectorAll('.tab').forEach(b=>{
+  b.addEventListener('click',()=>{
+    activeTab=b.dataset.tab;
+    document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t===b));
+    TABS.forEach(t=>document.getElementById('panel-'+t).classList.toggle('active',t===activeTab));
+    if(MOD[activeTab]&&MOD[activeTab].onShow)MOD[activeTab].onShow();
+  });
+});
+
+const MOD={};
+
+function fourBar(L, th, cx, cy, branch){
+  const Ax=cx, Ay=cy, Dx=cx+L.d, Dy=cy;
+  const Bx=Ax+L.a*Math.cos(th), By=Ay-L.a*Math.sin(th);
+  const dx=Dx-Bx, dy=Dy-By, dist=Math.hypot(dx,dy);
+  if(dist>L.b+L.c||dist<Math.abs(L.b-L.c))return null;
+  const aa=(L.b*L.b-L.c*L.c+dist*dist)/(2*dist);
+  const h2=L.b*L.b-aa*aa;
+  if(h2<0)return null;
+  const h=Math.sqrt(h2);
+  const px=Bx+aa*dx/dist, py=By+aa*dy/dist;
+  const s=branch===undefined?1:branch;
+  return {Ax,Ay,Bx,By,Cx:px-s*h*dy/dist,Cy:py+s*h*dx/dist,Dx,Dy,h2,dist};
+}
+function grashofInfo(L){
+  const v=[L.a,L.b,L.c,L.d];
+  const min=Math.min(...v), max=Math.max(...v), sum=v.reduce((s,x)=>s+x,0);
+  return {min,max,sum,grashof:(min+max)<=(sum-min-max),shortIdx:v.indexOf(min),slSum:min+max,pqSum:sum-min-max};
+}
+function rangeOf(L,cx,cy){
+  let valid=[];
+  for(let i=0;i<=360;i++){if(fourBar(L,i*Math.PI/180,cx,cy))valid.push(i);}
+  const fullRot=valid.length>=359;
+  if(fullRot)return {fullRot:true,lo:0,hi:2*Math.PI};
+  if(!valid.length)return {fullRot:false,lo:0,hi:0};
+  let gaps=[],start=valid[0],prev=valid[0];
+  for(let k=1;k<valid.length;k++){if(valid[k]-prev>1){gaps.push([start,prev]);start=valid[k];}prev=valid[k];}
+  gaps.push([start,prev]);
+  let best=gaps.reduce((b,g)=>(g[1]-g[0])>(b[1]-b[0])?g:b,gaps[0]);
+  return {fullRot:false,lo:best[0]*Math.PI/180,hi:best[1]*Math.PI/180};
+}
+function transAngle(p){
+  const v1x=p.Cx-p.Bx, v1y=p.Cy-p.By;
+  const v2x=p.Dx-p.Cx, v2y=p.Dy-p.Cy;
+  let a=Math.acos((v1x*v2x+v1y*v2y)/(Math.hypot(v1x,v1y)*Math.hypot(v2x,v2y)))*180/Math.PI;
+  return a>90?180-a:a;
+}
+
+(function(){
+  const P=document.getElementById('panel-grashof');
+  P.innerHTML=`
+  <div class="stage-card"><svg id="g-svg" viewBox="0 0 360 280" role="img"><title>四杆机构运动仿真</title></svg></div>
+  <div class="verdict" id="g-verdict">
+    <div class="lab">机构类型</div>
+    <div class="name" id="g-name">曲柄摇杆机构</div>
+    <div class="desc" id="g-desc">满足杆长条件，最短杆为连架杆</div>
+  </div>
+  <div class="readouts">
+    <div class="metric"><div class="lab">最短杆 + 最长杆</div><div class="val" id="g-sl">—</div></div>
+    <div class="metric"><div class="lab">其余两杆之和</div><div class="val" id="g-pq">—</div></div>
+  </div>
+  <div id="g-cond" style="border-radius:8px;padding:9px 12px;margin-bottom:12px;font-size:13px;font-weight:600;">—</div>
+  <div class="ctrl" data-k="a"><div class="head"><span><b style="color:var(--crank)">杆AB</b> 连架</span><span class="val">—</span></div><input type="range" min="10" max="100" step="1" value="30"></div>
+  <div class="ctrl" data-k="b"><div class="head"><span><b style="color:var(--coupler)">杆BC</b> 连杆</span><span class="val">—</span></div><input type="range" min="10" max="100" step="1" value="75"></div>
+  <div class="ctrl" data-k="c"><div class="head"><span><b style="color:var(--rocker)">杆CD</b> 连架</span><span class="val">—</span></div><input type="range" min="10" max="100" step="1" value="60"></div>
+  <div class="ctrl" data-k="d"><div class="head"><span><b style="color:var(--frame)">杆DA</b> 机架</span><span class="val">—</span></div><input type="range" min="10" max="100" step="1" value="80"></div>
+  <div class="btnrow">
+    <button id="g-play" class="primary">⏸ 暂停</button>
+    <span class="seg">预设</span>
+    <button class="g-preset" data-p="30,75,60,80">曲柄摇杆</button>
+    <button class="g-preset" data-p="70,75,60,30">双曲柄</button>
+    <button class="g-preset" data-p="60,30,75,80">双摇杆</button>
+    <button class="g-preset" data-p="25,90,30,45">不满足</button>
+    <button id="g-dead" class="danger">⊙ 奇异位形</button>
+  </div>
+  <p class="hint">拖动滑块或画面中 B、C 铰点改变杆长。A、D 为固定铰。点「奇异位形」看机构经过死点时减速、连杆与曲柄共线（传动角=0）。</p>`;
+
+  const svg=document.getElementById('g-svg');
+  const cx=90, cy=150;
+  let L={a:30,b:75,c:60,d:80};
+  let theta=0, playing=true, dir=1, dragging=null, deadMode=false, deadHold=0;
+  let rng={fullRot:true,lo:0,hi:2*Math.PI};
+  let view={s:1,ax:180,ay:140};
+
+  function rebuild(){ rng=rangeOf(L,cx,cy); if(!rng.fullRot){ if(theta<rng.lo)theta=rng.lo; if(theta>rng.hi)theta=rng.hi; } view=fitScale(L,cx,cy,360,280,24); }
+  function classify(){
+    const g=grashofInfo(L);
+    let name,desc,key;
+    if(!g.grashof){name='双摇杆机构';desc='不满足杆长条件，无曲柄';key='gray';}
+    else if(g.shortIdx===3){name='双曲柄机构';desc='满足条件，最短杆为机架';key='info';}
+    else if(g.shortIdx===1){name='双摇杆机构';desc='满足条件，最短杆为连杆';key='warn';}
+    else{name='曲柄摇杆机构';desc='满足条件，最短杆为连架杆';key='info';}
+    return {name,desc,g,key};
+  }
+  function nearSing(th){const p=fourBar(L,th,cx,cy);if(!p)return true;return p.h2<1;}
+  function deadProx(th){const p=fourBar(L,th,cx,cy);if(!p)return 0;const v1x=p.Bx-p.Ax,v1y=p.By-p.Ay,v2x=p.Cx-p.Bx,v2y=p.Cy-p.By;return Math.abs((v1x*v2x+v1y*v2y)/(Math.hypot(v1x,v1y)*Math.hypot(v2x,v2y)));}
+
+  function draw(){
+    while(svg.firstChild)svg.removeChild(svg.firstChild);
+    const Dx=cx+L.d;
+    let pos=fourBar(L,theta,cx,cy);
+    if(!pos){for(let d=1;d<=20&&!pos;d++){let m=fourBar(L,theta-d*Math.PI/180,cx,cy);let p2=fourBar(L,theta+d*Math.PI/180,cx,cy);if(m){theta-=d*Math.PI/180;pos=m;}else if(p2){theta+=d*Math.PI/180;pos=p2;}}}
+    const envPts=[{x:cx-15,y:cy},{x:Dx+15,y:cy}];
+    if(pos)envPts.push({x:pos.Bx,y:pos.By},{x:pos.Cx,y:pos.Cy});
+    const g=E('g',{transform:anchoredTransform(view.s,view.ax,view.ay,360,280)});
+    svg.appendChild(g);
+    g.appendChild(E('line',{x1:cx-15,y1:cy,x2:Dx+15,y2:cy,stroke:'#b4b2a9','stroke-width':0.5,'stroke-dasharray':'3 3'}));
+    if(pos){
+      let atDead=false;
+      if(deadMode){const v1x=pos.Bx-pos.Ax,v1y=pos.By-pos.Ay,v2x=pos.Cx-pos.Bx,v2y=pos.Cy-pos.By;if(Math.abs((v1x*v2x+v1y*v2y)/(Math.hypot(v1x,v1y)*Math.hypot(v2x,v2y)))>0.995)atDead=true;}
+      const cCol=cssv('--crank'),pCol=cssv('--coupler'),rCol=cssv('--rocker');
+      g.appendChild(E('line',{x1:pos.Ax,y1:pos.Ay,x2:pos.Bx,y2:pos.By,stroke:cCol,'stroke-width':atDead?6:4,'stroke-linecap':'round'}));
+      g.appendChild(E('line',{x1:pos.Bx,y1:pos.By,x2:pos.Cx,y2:pos.Cy,stroke:atDead?cCol:pCol,'stroke-width':atDead?6:4,'stroke-linecap':'round'}));
+      g.appendChild(E('line',{x1:pos.Cx,y1:pos.Cy,x2:pos.Dx,y2:pos.Dy,stroke:rCol,'stroke-width':4,'stroke-linecap':'round'}));
+      [['B',pos.Bx,pos.By,cssv('--danger')],['C',pos.Cx,pos.Cy,'#185fa5']].forEach(([lab,x,y,col])=>{
+        const c=E('circle',{cx:x,cy:y,r:8,fill:cssv('--surface'),stroke:col,'stroke-width':2});c.dataset.pt=lab;g.appendChild(c);
+        txt(g,x+(lab==='B'?-13:12),y-11,lab,13,col,'middle',600);
+      });
+      if(atDead){txt(svg,180,20,'⊙ 死点（奇异位形）',13,cssv('--danger'),'middle',600);txt(svg,180,36,'连杆与曲柄共线 · 传动角=0',11,cssv('--danger'),'middle');}
+    }
+    [['A',cx,cy],['D',Dx,cy]].forEach(([lab,x,y])=>{
+      g.appendChild(E('circle',{cx:x,cy:y,r:6,fill:'#5f5e5a'}));
+      g.appendChild(E('path',{d:`M${x-7} ${y+6} L${x+7} ${y+6} L${x} ${y-1} Z`,fill:'none',stroke:'#888780','stroke-width':1}));
+      txt(g,x,y+22,lab,13,cssv('--text2'),'middle');
+    });
+    svg._fitG=g;
+  }
+  function panel(){
+    const r=classify();
+    P.querySelector('#g-name').textContent=r.name;
+    P.querySelector('#g-desc').textContent=r.desc;
+    P.querySelector('#g-sl').textContent=Math.round(r.g.slSum);
+    P.querySelector('#g-pq').textContent=Math.round(r.g.pqSum);
+    const cond=P.querySelector('#g-cond');
+    if(r.g.grashof){cond.textContent='最短+最长 ≤ 其余两杆和 ✓ 满足';cond.style.color='var(--success)';cond.style.background='var(--surface2)';}
+    else{cond.textContent='最短+最长 > 其余两杆和 ✗ 不满足';cond.style.color='var(--danger)';cond.style.background='var(--danger-bg)';}
+    const v=P.querySelector('#g-verdict');
+    v.style.background=r.key==='info'?'var(--info-bg)':r.key==='warn'?'var(--warn-bg)':'var(--surface2)';
+  }
+  function sync(){P.querySelectorAll('.ctrl').forEach(c=>{const k=c.dataset.k;c.querySelector('input').value=L[k];c.querySelector('.val').textContent=Math.round(L[k]);});}
+
+  function step(){
+    if(activeTab==='grashof'&&playing&&!dragging){
+      let spd=0.02;
+      if(deadMode){const prox=deadProx(theta);if(prox>0.995&&deadHold<40){deadHold++;draw();requestAnimationFrame(step);return;}if(prox<=0.995)deadHold=0;spd=deadHold>=40?0.02:0.02-0.017*Math.max(0,(prox-0.7)/0.3);}
+      if(rng.fullRot){let nt=theta+dir*spd;if(nearSing(nt)){dir=-dir;nt=theta+dir*spd;}theta=nt;if(theta>2*Math.PI)theta-=2*Math.PI;if(theta<0)theta+=2*Math.PI;}
+      else if(rng.hi>rng.lo){let nt=theta+dir*spd;if(nt>=rng.hi||nt<=rng.lo||nearSing(nt)){dir=-dir;nt=theta+dir*spd;}theta=Math.max(rng.lo,Math.min(rng.hi,nt));}
+    }
+    draw();requestAnimationFrame(step);
+  }
+
+  P.querySelectorAll('.ctrl input').forEach(inp=>inp.addEventListener('input',e=>{const k=e.target.closest('.ctrl').dataset.k;L[k]=+e.target.value;e.target.closest('.ctrl').querySelector('.val').textContent=Math.round(L[k]);deadMode=false;rebuild();panel();}));
+  P.querySelectorAll('.g-preset').forEach(b=>b.addEventListener('click',()=>{const p=b.dataset.p.split(',').map(Number);L={a:p[0],b:p[1],c:p[2],d:p[3]};deadMode=false;deadHold=0;sync();rebuild();panel();}));
+  P.querySelector('#g-play').addEventListener('click',function(){playing=!playing;this.innerHTML=playing?'⏸ 暂停':'▶ 播放';});
+  P.querySelector('#g-dead').addEventListener('click',()=>{L={a:28,b:80,c:55,d:75};deadMode=true;deadHold=0;playing=true;P.querySelector('#g-play').innerHTML='⏸ 暂停';sync();rebuild();panel();});
+
+  function pt(evt){
+    const r=svg.getBoundingClientRect();
+    const t=evt.touches?evt.touches[0]:evt;
+    let x=(t.clientX-r.left)/r.width*360, y=(t.clientY-r.top)/r.height*280;
+    const g=svg._fitG;
+    if(g){const tr=g.getAttribute('transform');const m=tr.match(/translate\(([-\d.]+),([-\d.]+)\) scale\(([-\d.]+)\)/);if(m){const tx=+m[1],ty=+m[2],s=+m[3];x=(x-tx)/s;y=(y-ty)/s;}}
+    return {x,y};
+  }
+  function down(e){const tg=e.target;if(tg.dataset&&tg.dataset.pt){dragging=tg.dataset.pt;playing=false;P.querySelector('#g-play').innerHTML='▶ 播放';e.preventDefault();}}
+  function move(e){if(!dragging)return;e.preventDefault();const {x,y}=pt(e);if(dragging==='B'){const dx=x-cx,dy=y-cy;L.a=Math.round(Math.max(10,Math.min(100,Math.hypot(dx,dy))));theta=Math.atan2(-(dy),dx);sync();rebuild();panel();theta=Math.atan2(-(dy),dx);}else if(dragging==='C'){const Dx=cx+L.d,dx=x-Dx,dy=y-cy;L.c=Math.round(Math.max(10,Math.min(100,Math.hypot(dx,dy))));sync();rebuild();panel();}}
+  function up(){if(dragging&&!rng.fullRot)dir=(theta-rng.lo)<(rng.hi-theta)?1:-1;dragging=null;}
+  svg.addEventListener('mousedown',down);svg.addEventListener('mousemove',move);window.addEventListener('mouseup',up);
+  svg.addEventListener('touchstart',down,{passive:false});svg.addEventListener('touchmove',move,{passive:false});window.addEventListener('touchend',up);
+
+  MOD.grashof={onShow:()=>{sync();rebuild();panel();}};
+  sync();rebuild();panel();step();
+})();
+
+(function(){
+  const P=document.getElementById('panel-quick');
+  P.innerHTML=`
+  <div class="stage-card"><svg id="q-svg" viewBox="0 0 360 280" role="img"><title>急回特性仿真</title></svg></div>
+  <div class="readouts">
+    <div class="metric"><div class="lab">极位夹角 θ</div><div class="val" id="q-theta">—</div></div>
+    <div class="metric"><div class="lab">行程速比系数 K</div><div class="val" id="q-k">—</div></div>
+  </div>
+  <div id="q-note" style="background:var(--surface2);border-radius:8px;padding:9px 12px;margin-bottom:12px;font-size:12px;color:var(--text2);line-height:1.6;">曲柄匀速转动，工作行程慢、回程快，K&gt;1 即有急回特性。</div>
+  <div class="ctrl" data-k="a"><div class="head"><span><b style="color:var(--crank)">曲柄AB</b></span><span class="val">—</span></div><input type="range" min="35" max="110" step="1" value="55"></div>
+  <div class="ctrl" data-k="b"><div class="head"><span><b style="color:var(--coupler)">连杆BC</b></span><span class="val">—</span></div><input type="range" min="80" max="190" step="1" value="150"></div>
+  <div class="ctrl" data-k="c"><div class="head"><span><b style="color:var(--rocker)">摇杆CD</b></span><span class="val">—</span></div><input type="range" min="60" max="190" step="1" value="90"></div>
+  <div class="ctrl" data-k="d"><div class="head"><span><b style="color:var(--frame)">机架DA</b></span><span class="val">—</span></div><input type="range" min="80" max="190" step="1" value="140"></div>
+  <div class="btnrow">
+    <button id="q-play" class="primary">⏸ 暂停</button>
+    <button id="q-trace">显示极位</button>
+    <span class="seg">预设</span>
+    <button class="q-preset" data-p="55,150,90,140">明显急回</button>
+    <button class="q-preset" data-p="60,135,115,150">轻微急回</button>
+  </div>
+  <p class="hint">两条灰色虚线是摇杆的两个极限位置，夹角即极位夹角 θ。曲柄转过的两段角度不等，导致往复快慢不同，这就是急回特性。</p>`;
+
+  const svg=document.getElementById('q-svg');
+  const cx=110, cy=150;
+  let L={a:55,b:150,c:90,d:140};
+  let theta=0, playing=true, showExt=true;
+  let rng={fullRot:true,lo:0,hi:2*Math.PI};
+  let view={s:1,ax:180,ay:140};
+
+  function rebuild(){ rng=rangeOf(L,cx,cy); view=fitScale(L,cx,cy,360,280,22); }
+  function nearSing(th){const p=fourBar(L,th,cx,cy);if(!p)return true;return p.h2<1;}
+
+  function extremeData(){
+    const Dx=cx+L.d;
+    let crankAngs=[], cPts=[];
+    [L.a+L.b, Math.abs(L.b-L.a)].forEach(ac=>{
+      if(ac>L.d+L.c||ac<Math.abs(L.d-L.c)){crankAngs.push(null);cPts.push(null);return;}
+      const cosDAC=(ac*ac+L.d*L.d-L.c*L.c)/(2*ac*L.d);
+      const angDAC=Math.acos(Math.max(-1,Math.min(1,cosDAC)));
+      crankAngs.push(angDAC);
+      const Cx=cx+ac*Math.cos(-angDAC), Cy=cy-ac*Math.sin(-angDAC);
+      cPts.push({x:Cx,y:Cy});
+    });
+    return {crankAngs,cPts,Dx};
+  }
+  function couplerLineAngles(){
+    return extremeData().crankAngs;
+  }
+
+  function draw(){
+    while(svg.firstChild)svg.removeChild(svg.firstChild);
+    const Dx=cx+L.d;
+    let pos=fourBar(L,theta,cx,cy);
+    if(!pos){for(let d=1;d<=20&&!pos;d++){let m=fourBar(L,theta-d*Math.PI/180,cx,cy);let p2=fourBar(L,theta+d*Math.PI/180,cx,cy);if(m){theta-=d*Math.PI/180;pos=m;}else if(p2){theta+=d*Math.PI/180;pos=p2;}}}
+    const ed=extremeData();
+    const g=E('g',{transform:anchoredTransform(view.s,view.ax,view.ay,360,280)});
+    svg.appendChild(g);
+    g.appendChild(E('line',{x1:cx-15,y1:cy,x2:Dx+15,y2:cy,stroke:'#b4b2a9','stroke-width':0.5,'stroke-dasharray':'3 3'}));
+    if(showExt){
+      ed.cPts.forEach(cp=>{if(cp==null)return;g.appendChild(E('line',{x1:Dx,y1:cy,x2:cp.x,y2:cp.y,stroke:'#888780','stroke-width':1.5,'stroke-dasharray':'4 3'}));g.appendChild(E('circle',{cx:cp.x,cy:cp.y,r:3,fill:'#888780'}));});
+    }
+    if(pos){
+      g.appendChild(E('line',{x1:pos.Ax,y1:pos.Ay,x2:pos.Bx,y2:pos.By,stroke:cssv('--crank'),'stroke-width':4,'stroke-linecap':'round'}));
+      g.appendChild(E('line',{x1:pos.Bx,y1:pos.By,x2:pos.Cx,y2:pos.Cy,stroke:cssv('--coupler'),'stroke-width':4,'stroke-linecap':'round'}));
+      g.appendChild(E('line',{x1:pos.Cx,y1:pos.Cy,x2:pos.Dx,y2:pos.Dy,stroke:cssv('--rocker'),'stroke-width':4,'stroke-linecap':'round'}));
+      [['B',pos.Bx,pos.By,cssv('--crank')],['C',pos.Cx,pos.Cy,cssv('--coupler')]].forEach(([lab,x,y,col])=>{g.appendChild(E('circle',{cx:x,cy:y,r:7,fill:cssv('--surface'),stroke:col,'stroke-width':2}));});
+    }
+    [['A',cx,cy],['D',Dx,cy]].forEach(([lab,x,y])=>{g.appendChild(E('circle',{cx:x,cy:y,r:6,fill:'#5f5e5a'}));g.appendChild(E('path',{d:`M${x-7} ${y+6} L${x+7} ${y+6} L${x} ${y-1} Z`,fill:'none',stroke:'#888780','stroke-width':1}));txt(g,x,y+22,lab,13,cssv('--text2'),'middle');});
+  }
+  function panel(){
+    const ed=extremeData();
+    if(ed.crankAngs[0]!=null&&ed.crankAngs[1]!=null){
+      let theta_ext=Math.abs((ed.crankAngs[0]-ed.crankAngs[1])*180/Math.PI);
+      if(theta_ext>180)theta_ext=360-theta_ext;
+      const K=(180+theta_ext)/(180-theta_ext);
+      P.querySelector('#q-theta').textContent=Math.round(theta_ext)+'°';
+      P.querySelector('#q-k').textContent=K.toFixed(2);
+      const note=P.querySelector('#q-note');
+      if(K>1.15)note.textContent='K明显大于1，有显著急回特性。工作行程慢而有力，回程快，提高效率。';
+      else if(K>1.02)note.textContent='K略大于1，急回特性较轻微。';
+      else note.textContent='K≈1，几乎无急回特性，往复近似匀速。';
+    } else {
+      P.querySelector('#q-theta').textContent='—';
+      P.querySelector('#q-k').textContent='—';
+      P.querySelector('#q-note').textContent='当前杆长曲柄不能整周转动，无法形成稳定急回。请调整为曲柄摇杆机构。';
+    }
+  }
+  function sync(){P.querySelectorAll('.ctrl').forEach(c=>{const k=c.dataset.k;c.querySelector('input').value=L[k];c.querySelector('.val').textContent=Math.round(L[k]);});}
+
+  let dir=1;
+  function step(){
+    if(activeTab==='quick'&&playing){
+      let spd=0.022;
+      if(rng.fullRot){let nt=theta+dir*spd;if(nearSing(nt)){dir=-dir;nt=theta+dir*spd;}theta=nt;if(theta>2*Math.PI)theta-=2*Math.PI;if(theta<0)theta+=2*Math.PI;}
+      else if(rng.hi>rng.lo){let nt=theta+dir*spd;if(nt>=rng.hi||nt<=rng.lo||nearSing(nt)){dir=-dir;nt=theta+dir*spd;}theta=Math.max(rng.lo,Math.min(rng.hi,nt));}
+    }
+    if(activeTab==='quick')draw();
+    requestAnimationFrame(step);
+  }
+
+  P.querySelectorAll('.ctrl input').forEach(inp=>inp.addEventListener('input',e=>{const k=e.target.closest('.ctrl').dataset.k;L[k]=+e.target.value;e.target.closest('.ctrl').querySelector('.val').textContent=Math.round(L[k]);rebuild();panel();}));
+  P.querySelectorAll('.q-preset').forEach(b=>b.addEventListener('click',()=>{const p=b.dataset.p.split(',').map(Number);L={a:p[0],b:p[1],c:p[2],d:p[3]};sync();rebuild();panel();}));
+  P.querySelector('#q-play').addEventListener('click',function(){playing=!playing;this.innerHTML=playing?'⏸ 暂停':'▶ 播放';});
+  P.querySelector('#q-trace').addEventListener('click',function(){showExt=!showExt;this.textContent=showExt?'隐藏极位':'显示极位';});
+
+  MOD.quick={onShow:()=>{sync();rebuild();panel();draw();}};
+  sync();rebuild();panel();step();
+})();
+
+(function(){
+  const P=document.getElementById('panel-trans');
+  P.innerHTML=`
+  <div class="stage-card"><svg id="t-svg" viewBox="0 0 360 300" role="img"><title>传动角仿真</title></svg></div>
+  <div class="readouts">
+    <div class="metric"><div class="lab">当前传动角 γ</div><div class="val" id="t-gamma">—</div></div>
+    <div class="metric"><div class="lab">最小传动角 γmin</div><div class="val" id="t-gmin">—</div></div>
+  </div>
+  <div id="t-warn" style="border-radius:8px;padding:9px 12px;margin-bottom:12px;font-size:12px;line-height:1.6;">—</div>
+  <div class="ctrl" data-k="a"><div class="head"><span><b style="color:var(--crank)">曲柄AB</b></span><span class="val">—</span></div><input type="range" min="35" max="110" step="1" value="55"></div>
+  <div class="ctrl" data-k="b"><div class="head"><span><b style="color:var(--coupler)">连杆BC</b></span><span class="val">—</span></div><input type="range" min="80" max="190" step="1" value="150"></div>
+  <div class="ctrl" data-k="c"><div class="head"><span><b style="color:var(--rocker)">摇杆CD</b></span><span class="val">—</span></div><input type="range" min="60" max="190" step="1" value="100"></div>
+  <div class="ctrl" data-k="d"><div class="head"><span><b style="color:var(--frame)">机架DA</b></span><span class="val">—</span></div><input type="range" min="80" max="190" step="1" value="140"></div>
+  <div class="btnrow">
+    <button id="t-play" class="primary">⏸ 暂停</button>
+    <button id="t-mark">定位γmin</button>
+  </div>
+  <p class="hint">传动角γ是连杆与摇杆的夹角，决定传力效果。γ越接近90°传力越好；γ过小（一般规定 γmin≥40°）时机构接近卡死。连杆与摇杆夹角处实时标出γ，过小时变红。</p>`;
+
+  const svg=document.getElementById('t-svg');
+  const cx=110, cy=160;
+  let L={a:55,b:150,c:100,d:140};
+  let theta=0, playing=true;
+  let rng={fullRot:true,lo:0,hi:2*Math.PI}, gminData={val:90,ang:0};
+  let view={s:1,ax:180,ay:160};
+
+  function rebuild(){
+    rng=rangeOf(L,cx,cy);
+    view=fitScale(L,cx,cy,360,300,28);
+    let gmin=180,gang=0;
+    for(let i=0;i<360;i++){const p=fourBar(L,i*Math.PI/180,cx,cy);if(!p)continue;const g=transAngle(p);if(g<gmin){gmin=g;gang=i*Math.PI/180;}}
+    gminData={val:gmin,ang:gang};
+  }
+  function nearSing(th){const p=fourBar(L,th,cx,cy);if(!p)return true;return p.h2<1;}
+
+  function draw(){
+    while(svg.firstChild)svg.removeChild(svg.firstChild);
+    const Dx=cx+L.d;
+    let pos=fourBar(L,theta,cx,cy);
+    if(!pos){for(let d=1;d<=20&&!pos;d++){let m=fourBar(L,theta-d*Math.PI/180,cx,cy);let p2=fourBar(L,theta+d*Math.PI/180,cx,cy);if(m){theta-=d*Math.PI/180;pos=m;}else if(p2){theta+=d*Math.PI/180;pos=p2;}}}
+    const g=E('g',{transform:anchoredTransform(view.s,view.ax,view.ay,360,300)});
+    svg.appendChild(g);
+    g.appendChild(E('line',{x1:cx-15,y1:cy,x2:Dx+15,y2:cy,stroke:'#b4b2a9','stroke-width':0.5,'stroke-dasharray':'3 3'}));
+    if(pos){
+      const gamma=transAngle(pos);
+      const small=gamma<40;
+      g.appendChild(E('line',{x1:pos.Ax,y1:pos.Ay,x2:pos.Bx,y2:pos.By,stroke:cssv('--crank'),'stroke-width':4,'stroke-linecap':'round'}));
+      g.appendChild(E('line',{x1:pos.Bx,y1:pos.By,x2:pos.Cx,y2:pos.Cy,stroke:cssv('--coupler'),'stroke-width':4,'stroke-linecap':'round'}));
+      g.appendChild(E('line',{x1:pos.Cx,y1:pos.Cy,x2:pos.Dx,y2:pos.Dy,stroke:small?cssv('--danger'):cssv('--rocker'),'stroke-width':4,'stroke-linecap':'round'}));
+      const arcCol=small?cssv('--danger'):cssv('--success');
+      const a1=Math.atan2(pos.By-pos.Cy,pos.Bx-pos.Cx), a2=Math.atan2(pos.Dy-pos.Cy,pos.Dx-pos.Cx);
+      g.appendChild(E('path',{d:describeArc(pos.Cx,pos.Cy,20,a1,a2),fill:'none',stroke:arcCol,'stroke-width':2}));
+      const mid=(a1+a2)/2;
+      txt(g,pos.Cx+30*Math.cos(mid),pos.Cy+30*Math.sin(mid),'γ='+Math.round(gamma)+'°',12,arcCol,'middle',600);
+      [['B',pos.Bx,pos.By,cssv('--crank')],['C',pos.Cx,pos.Cy,cssv('--coupler')]].forEach(([lab,x,y,col])=>{g.appendChild(E('circle',{cx:x,cy:y,r:7,fill:cssv('--surface'),stroke:col,'stroke-width':2}));});
+    }
+    [['A',cx,cy],['D',Dx,cy]].forEach(([lab,x,y])=>{g.appendChild(E('circle',{cx:x,cy:y,r:6,fill:'#5f5e5a'}));g.appendChild(E('path',{d:`M${x-7} ${y+6} L${x+7} ${y+6} L${x} ${y-1} Z`,fill:'none',stroke:'#888780','stroke-width':1}));txt(g,x,y+22,lab,13,cssv('--text2'),'middle');});
+  }
+  function describeArc(cx,cy,r,a1,a2){
+    let da=a2-a1;while(da>Math.PI)da-=2*Math.PI;while(da<-Math.PI)da+=2*Math.PI;
+    const x1=cx+r*Math.cos(a1),y1=cy+r*Math.sin(a1),x2=cx+r*Math.cos(a1+da),y2=cy+r*Math.sin(a1+da);
+    const large=Math.abs(da)>Math.PI?1:0, sweep=da>0?1:0;
+    return `M${x1} ${y1} A${r} ${r} 0 ${large} ${sweep} ${x2} ${y2}`;
+  }
+  function panel(){
+    let pos=fourBar(L,theta,cx,cy);
+    P.querySelector('#t-gamma').textContent=pos?Math.round(transAngle(pos))+'°':'—';
+    P.querySelector('#t-gmin').textContent=Math.round(gminData.val)+'°';
+    const w=P.querySelector('#t-warn');
+    if(gminData.val>=50){w.textContent='γmin ≥ 50°，传力性能良好。';w.style.color='var(--success)';w.style.background='var(--surface2)';}
+    else if(gminData.val>=40){w.textContent='γmin 在 40~50°，满足一般机械的最低要求。';w.style.color='var(--text2)';w.style.background='var(--surface2)';}
+    else{w.textContent='γmin < 40°，传力性能差，机构接近卡死，应重新设计杆长。';w.style.color='var(--danger)';w.style.background='var(--danger-bg)';}
+  }
+  function sync(){P.querySelectorAll('.ctrl').forEach(c=>{const k=c.dataset.k;c.querySelector('input').value=L[k];c.querySelector('.val').textContent=Math.round(L[k]);});}
+
+  let dir=1;
+  function step(){
+    if(activeTab==='trans'&&playing){
+      let spd=0.02;
+      if(rng.fullRot){let nt=theta+dir*spd;if(nearSing(nt)){dir=-dir;nt=theta+dir*spd;}theta=nt;if(theta>2*Math.PI)theta-=2*Math.PI;if(theta<0)theta+=2*Math.PI;}
+      else if(rng.hi>rng.lo){let nt=theta+dir*spd;if(nt>=rng.hi||nt<=rng.lo||nearSing(nt)){dir=-dir;nt=theta+dir*spd;}theta=Math.max(rng.lo,Math.min(rng.hi,nt));}
+    }
+    if(activeTab==='trans'){draw();panel();}
+    requestAnimationFrame(step);
+  }
+
+  P.querySelectorAll('.ctrl input').forEach(inp=>inp.addEventListener('input',e=>{const k=e.target.closest('.ctrl').dataset.k;L[k]=+e.target.value;e.target.closest('.ctrl').querySelector('.val').textContent=Math.round(L[k]);rebuild();}));
+  P.querySelector('#t-play').addEventListener('click',function(){playing=!playing;this.innerHTML=playing?'⏸ 暂停':'▶ 播放';});
+  P.querySelector('#t-mark').addEventListener('click',()=>{theta=gminData.ang;playing=false;P.querySelector('#t-play').innerHTML='▶ 播放';draw();panel();});
+
+  MOD.trans={onShow:()=>{sync();rebuild();panel();draw();}};
+  sync();rebuild();panel();step();
+})();
+
+
+/* ================= ④ 死点位置 ================= */
+(function(){
+  const P=document.getElementById('panel-dead');
+  P.innerHTML=[
+  '<div class="stage-card"><svg id="d-svg" viewBox="0 0 360 320" role="img"><title>死点位置仿真</title></svg></div>',
+  '<div class="verdict" id="d-verdict"><div class="lab">机构状态</div><div class="name" id="d-status">正常传动</div><div class="desc" id="d-sdesc">—</div></div>',
+  '<div class="readouts" style="grid-template-columns:repeat(3,minmax(0,1fr));">',
+  '<div class="metric"><div class="lab">传动角 γ</div><div class="val" id="d-gam">—</div></div>',
+  '<div class="metric"><div class="lab">力臂 h</div><div class="val" id="d-h">—</div></div>',
+  '<div class="metric"><div class="lab">力矩 M<sub>A</sub> = F·h</div><div class="val" id="d-m">—</div></div>',
+  '</div>',
+  '<div class="ctrl" style="margin-bottom:5px;"><div class="head"><span><b>原动件切换</b>（同一共线位置，谁是原动件？）</span></div></div>',
+  '<div class="btnrow" style="margin-top:0;margin-bottom:12px;">',
+  '<button id="d-mr" class="dbtn on">摇杆CD 主动</button>',
+  '<button id="d-mc" class="dbtn">曲柄AB 主动</button>',
+  '</div>',
+  '<div class="ctrl" id="d-fctrl" style="display:none;"><div class="head"><span>驱动力 F（摇杆经连杆作用于曲柄）</span><span class="val" id="d-fv">50%</span></div><input type="range" id="d-fs" min="0" max="100" step="1" value="50"></div>',
+  '<div id="d-msg" style="border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:13px;line-height:1.7;background:var(--surface2);min-height:56px;"></div>',
+  '<div class="btnrow">',
+  '<button id="d-play" class="primary">▶ 播放</button>',
+  '<button id="d-aux">显示受力机理</button>',
+  '<button id="d-reset">复位</button>',
+  '<button id="d-demo" class="primary">▶ 教师演示</button>',
+  '<button id="d-quiz">✎ 课堂检测</button>',
+  '</div>',
+  '<details id="d-more" style="margin-top:12px;">',
+  '<summary style="font-size:13px;font-weight:600;cursor:pointer;padding:6px 0;">更多说明（探究任务 · 提示 · 结论）</summary>',
+  '<div class="btnrow" style="margin-top:4px;"><button id="d-hint">提示 0/3</button></div>',
+  '<div id="d-hints" style="font-size:12px;color:var(--text2);line-height:1.8;margin-bottom:12px;"></div>',
+  '<div style="background:var(--surface2);border-radius:8px;padding:10px 12px;margin-bottom:12px;">',
+  '<div style="font-size:13px;font-weight:600;margin-bottom:5px;">探究任务</div>',
+  '<div class="dtask" id="d-t1">○ 任务一：拖动摇杆，寻找机构无法继续运动的位置</div>',
+  '<div class="dtask" id="d-t2">○ 任务二：切换原动件，观察同一共线位置是否仍会卡住</div>',
+  '<div class="dtask" id="d-t3">○ 任务三：在死点位置增大驱动力，观察驱动力矩是否改变</div>',
+  '</div>',
+  '<div style="border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:13px;line-height:1.9;background:var(--info-bg);">',
+  '<div><b>判死点：</b>看原动件，也看共线关系。</div>',
+  '<div id="d-c2" style="display:none;"><b>懂机理：</b>力臂为零，驱动力矩为零。</div>',
+  '<div id="d-c3" style="display:none;"><b>做设计：</b>不利时设法克服，有利时合理利用。</div>',
+  '</div>',
+  '<div id="d-final" style="display:none;border-radius:8px;padding:11px 13px;margin-bottom:12px;font-size:13px;line-height:1.8;background:var(--danger-bg);border:0.5px solid var(--danger);"><b>探究结论：</b>死点判定不能只看构件是否共线，还必须判断谁是原动件。摇杆为原动件，且曲柄与连杆共线时，连杆作用力对曲柄回转中心的力臂为零，机构进入死点。</div>',
+  '<p class="hint">拖动原动件端部的虚线手柄即可驱动机构。摇杆主动时，机构只能在两个极限位置之间运动：到达极限位置时曲柄AB与连杆BC共线，传动角 γ = 0，力臂 h 收缩为零，增大驱动力也无法继续——这就是死点。点击「显示受力机理」查看作用线、力臂与驱动力矩；切换到曲柄主动再经过同一位置，对比现象。与「③ 压力角与传动角」相互印证。</p>',
+  '</details>'
+  ].join('');
+
+  const svg=document.getElementById('d-svg');
+  const cx=100, cy=160, TAU=2*Math.PI;
+  const L={a:42,b:126,c:90,d:150};          // 曲柄摇杆机构(70:210:150:250 比例)
+  const ORANGE='#dd7a1a', ORANGE_D='#b25e09', FORCEC='#185fa5';
+  let mode='rocker', theta=0, lo=0, hi=0, dir=-1, deadLoId=1, deadHiId=2;
+  let playing=false, dragging=false, F=50, showMechanism=false, hintN=0;
+  let found1=false, found2=false, toastUntil=0;
+  let dragGoal=null;
+  let visitedR=true, visitedC=false, crankPass=false;
+  let tasks={t1:false,t2:false,t3:false};
+  let demo={active:false,paused:false,phase:-1,t:0,msg:''};
+  let view={s:1,ax:180,ay:160}, lastT=performance.now();
+
+  function norm(t){t%=TAU;return t<0?t+TAU:t;}
+  function proxAt(th){
+    const p=fourBar(L,th,cx,cy); if(!p)return 0;
+    const v1x=p.Bx-p.Ax,v1y=p.By-p.Ay,v2x=p.Cx-p.Bx,v2y=p.Cy-p.By;
+    return Math.abs((v1x*v2x+v1y*v2y)/(Math.hypot(v1x,v1y)*Math.hypot(v2x,v2y)));
+  }
+  // 数值寻找两个死点曲柄角(AB与BC共线)
+  const DT=[];
+  (function(){
+    const N=3600, arr=[];
+    for(let i=0;i<N;i++)arr.push(proxAt(i/N*TAU));
+    const cand=[];
+    for(let i=0;i<N;i++){if(arr[i]>0.999&&arr[i]>=arr[(i-1+N)%N]&&arr[i]>arr[(i+1)%N])cand.push(i);}
+    const groups=[];
+    cand.forEach(i=>{const gl=groups[groups.length-1];if(gl&&i-gl[gl.length-1]<12)gl.push(i);else groups.push([i]);});
+    groups.forEach(gr=>{let bi=gr[0];gr.forEach(i=>{if(arr[i]>arr[bi])bi=i;});DT.push(bi/N*TAU);});
+  })();
+  const D1=Math.min(DT[0],DT[1]), D2=Math.max(DT[0],DT[1]);
+  function phiAtDead(td){const p=fourBar(L,td,cx,cy);return Math.atan2(-(p.Cy-p.Dy),p.Cx-p.Dx);}
+  const PHI_LO=Math.min(phiAtDead(D1),phiAtDead(D2)), PHI_HI=Math.max(phiAtDead(D1),phiAtDead(D2));
+  const CD1=fourBar(L,D1,cx,cy), CD2=fourBar(L,D2,cx,cy);
+
+  function setArcFromTheta(){
+    const t=norm(theta);
+    if(t>=D1&&t<=D2){lo=D1;hi=D2;deadLoId=1;deadHiId=2;theta=t;}
+    else{lo=D2;hi=D1+TAU;deadLoId=2;deadHiId=1;theta=t<D1?t+TAU:t;}
+  }
+  function deadId(){
+    if(mode!=='rocker')return 0;
+    if(Math.abs(theta-lo)<0.021)return deadLoId;
+    if(Math.abs(theta-hi)<0.021)return deadHiId;
+    return 0;
+  }
+  function forceGeom(p){
+    const ux=p.Bx-p.Cx, uy=p.By-p.Cy, ul=Math.hypot(ux,uy), nx=ux/ul, ny=uy/ul;
+    const vx=p.Cx-p.Bx, vy=p.Cy-p.By, vv=vx*vx+vy*vy;
+    const t=((p.Ax-p.Bx)*vx+(p.Ay-p.By)*vy)/vv;
+    const Hx=p.Bx+t*vx, Hy=p.By+t*vy;
+    const h=Math.hypot(p.Ax-Hx,p.Ay-Hy);
+    const tau=(p.Bx-p.Ax)*ny-(p.By-p.Ay)*nx;
+    return {nx,ny,Hx,Hy,h,tau};
+  }
+  function computeView(){
+    const pts=[];
+    for(let i=0;i<360;i+=2){
+      const p=fourBar(L,i*Math.PI/180,cx,cy); if(!p)continue;
+      pts.push([p.Bx,p.By],[p.Cx,p.Cy]);
+      const ux=p.Bx-p.Cx,uy=p.By-p.Cy,ul=Math.hypot(ux,uy);
+      pts.push([p.Bx+ux/ul*66,p.By+uy/ul*66]);
+    }
+    pts.push([cx-18,cy-56],[cx+L.d+18,cy+28],[CD1.Cx,CD1.Cy+30],[CD2.Cx,CD2.Cy+30]);
+    let minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9;
+    pts.forEach(q=>{minX=Math.min(minX,q[0]);maxX=Math.max(maxX,q[0]);minY=Math.min(minY,q[1]);maxY=Math.max(maxY,q[1]);});
+    view={s:Math.min((360-12)/(maxX-minX),(320-12)/(maxY-minY)),ax:(minX+maxX)/2,ay:(minY+maxY)/2};
+  }
+  function arcPath(ccx,ccy,r,a0,da){
+    const x1=ccx+r*Math.cos(a0),y1=ccy+r*Math.sin(a0),x2=ccx+r*Math.cos(a0+da),y2=ccy+r*Math.sin(a0+da);
+    return 'M'+x1+' '+y1+' A'+r+' '+r+' 0 '+(Math.abs(da)>Math.PI?1:0)+' '+(da>0?1:0)+' '+x2+' '+y2;
+  }
+  function arrowHead(g,x,y,ang,size,col){
+    const a1=ang+Math.PI*0.82, a2=ang-Math.PI*0.82;
+    g.appendChild(E('path',{d:'M'+x+' '+y+' L'+(x+size*Math.cos(a1))+' '+(y+size*Math.sin(a1))+' L'+(x+size*Math.cos(a2))+' '+(y+size*Math.sin(a2))+' Z',fill:col}));
+  }
+  function pill(g,x,y){
+    g.appendChild(E('rect',{x:x-27,y:y-9.5,width:54,height:17,rx:8.5,fill:FORCEC}));
+    txt(g,x,y+3.8,'原动件',10.5,'#ffffff','middle',600);
+  }
+  function pillAt(g,x1,y1,x2,y2,rx,ry){
+    const mx=(x1+x2)/2,my=(y1+y2)/2;
+    const dx=x2-x1,dy=y2-y1,dl=Math.hypot(dx,dy);
+    let nx=-dy/dl,ny=dx/dl;
+    if((mx-rx)*nx+(my-ry)*ny<0){nx=-nx;ny=-ny;}
+    pill(g,mx+nx*30+dx/dl*8,my+ny*30+dy/dl*8);
+  }
+  function gammaAt(p){
+    if(mode==='crank')return transAngle(p);   // 曲柄主动: 从动件为摇杆CD(同③选项卡)
+    const v1x=p.Cx-p.Bx,v1y=p.Cy-p.By,v2x=p.Ax-p.Bx,v2y=p.Ay-p.By;
+    const co=Math.abs((v1x*v2x+v1y*v2y)/(Math.hypot(v1x,v1y)*Math.hypot(v2x,v2y)));
+    return Math.acos(Math.min(1,co))*180/Math.PI;  // 摇杆主动: 从动件为曲柄AB
+  }
+  function arcBetween(g,x,y,r,aa1,aa2,col,wd){
+    let da=aa2-aa1;while(da>Math.PI)da-=TAU;while(da<-Math.PI)da+=TAU;
+    g.appendChild(E('path',{d:arcPath(x,y,r,aa1,da),fill:'none',stroke:col,'stroke-width':wd||2}));
+    return aa1+da/2;
+  }
+  function drawAngles(g,p,did){
+    const jx=mode==='rocker'?p.Bx:p.Cx, jy=mode==='rocker'?p.By:p.Cy;
+    let r1x,r1y,r2x,r2y;
+    if(mode==='rocker'){r1x=p.Cx-p.Bx;r1y=p.Cy-p.By;r2x=p.Ax-p.Bx;r2y=p.Ay-p.By;}
+    else{r1x=p.Bx-p.Cx;r1y=p.By-p.Cy;r2x=p.Dx-p.Cx;r2y=p.Dy-p.Cy;}
+    if(r1x*r2x+r1y*r2y<0){r2x=-r2x;r2y=-r2y;}
+    const gm=gammaAt(p), gamCol=gm<40?cssv('--danger'):FORCEC;
+    if(did){
+      txt(g,p.Ax+14,p.Ay-24,'γ = 0°',12,cssv('--danger'),'start',700);
+      return;
+    }
+    const a1=Math.atan2(r1y,r1x), a2=Math.atan2(r2y,r2x);
+    const mid=arcBetween(g,jx,jy,15,a1,a2,gamCol,2);
+    txt(g,jx+26*Math.cos(mid),jy+26*Math.sin(mid),'γ='+Math.round(gm)+'°',11.5,gamCol,'middle',700);
+  }
+
+  function draw(){
+    while(svg.firstChild)svg.removeChild(svg.firstChild);
+    const Dx=cx+L.d;
+    const p=fourBar(L,norm(theta),cx,cy);
+    const g=E('g',{transform:anchoredTransform(view.s,view.ax,view.ay,360,320)});
+    svg.appendChild(g); svg._fitG=g;
+    const did=deadId(), px=proxAt(norm(theta));
+    const near=mode==='rocker'&&!did&&px>0.93;
+    const colPass=mode==='crank'&&px>0.985;
+    const cCol=cssv('--crank'),pCol=cssv('--coupler'),rCol=cssv('--rocker'),dCol=cssv('--danger');
+
+    g.appendChild(E('line',{x1:cx-15,y1:cy,x2:Dx+15,y2:cy,stroke:'#b4b2a9','stroke-width':0.5,'stroke-dasharray':'3 3'}));
+
+    [[CD1,'死点位置1',found1],[CD2,'死点位置2',found2]].forEach(([cd,lab,f])=>{
+      if(!f)return;
+      g.appendChild(E('circle',{cx:cd.Cx,cy:cd.Cy,r:3.5,fill:dCol}));
+      txt(g,cd.Cx,cd.Cy+20,lab,12,dCol,'middle',600);
+    });
+
+    if(p){
+      const abCol=did?dCol:(near||colPass?ORANGE:cCol);
+      const bcCol=did?dCol:(near||colPass?ORANGE:pCol);
+      const w=did?6:(near||colPass?5:4);
+      g.appendChild(E('line',{x1:p.Ax,y1:p.Ay,x2:p.Bx,y2:p.By,stroke:abCol,'stroke-width':w,'stroke-linecap':'round'}));
+      g.appendChild(E('line',{x1:p.Bx,y1:p.By,x2:p.Cx,y2:p.Cy,stroke:bcCol,'stroke-width':w,'stroke-linecap':'round'}));
+      g.appendChild(E('line',{x1:p.Cx,y1:p.Cy,x2:p.Dx,y2:p.Dy,stroke:rCol,'stroke-width':4,'stroke-linecap':'round'}));
+
+      drawAngles(g,p,did);
+
+      if(mode==='rocker'&&showMechanism){
+        const fg=forceGeom(p);
+        const fLen=10+0.44*F;
+        g.appendChild(E('line',{x1:p.Cx-fg.nx*30,y1:p.Cy-fg.ny*30,x2:p.Bx+fg.nx*(fLen+14),y2:p.By+fg.ny*(fLen+14),stroke:did?dCol:FORCEC,'stroke-width':did?1.6:1.1,'stroke-dasharray':'5 4'}));
+        if(F>2){
+          const tx2=p.Bx+fg.nx*fLen, ty2=p.By+fg.ny*fLen;
+          g.appendChild(E('line',{x1:p.Bx,y1:p.By,x2:tx2,y2:ty2,stroke:FORCEC,'stroke-width':2.4,'stroke-linecap':'round'}));
+          arrowHead(g,tx2,ty2,Math.atan2(fg.ny,fg.nx),6.5,FORCEC);
+          txt(g,tx2+fg.nx*9-fg.ny*9,ty2+fg.ny*9+fg.nx*9,'F',13,FORCEC,'middle',700);
+        }
+        if(fg.h>1.2){
+          g.appendChild(E('line',{x1:p.Ax,y1:p.Ay,x2:fg.Hx,y2:fg.Hy,stroke:ORANGE,'stroke-width':1.6,'stroke-dasharray':'4 3'}));
+          g.appendChild(E('circle',{cx:fg.Hx,cy:fg.Hy,r:2.4,fill:ORANGE}));
+          const bl=Math.hypot(p.Cx-p.Bx,p.Cy-p.By), ux2=(p.Cx-p.Bx)/bl, uy2=(p.Cy-p.By)/bl;
+          const wx=(p.Ax-fg.Hx)/fg.h, wy=(p.Ay-fg.Hy)/fg.h;
+          const s1x=fg.Hx+ux2*5, s1y=fg.Hy+uy2*5, s2x=fg.Hx+wx*5, s2y=fg.Hy+wy*5;
+          g.appendChild(E('path',{d:'M'+s1x+' '+s1y+' L'+(s1x+wx*5)+' '+(s1y+wy*5)+' L'+(s2x+ux2*5)+' '+(s2y+uy2*5)+' L'+s2x+' '+s2y,fill:'none',stroke:ORANGE,'stroke-width':1}));
+          txt(g,(p.Ax+fg.Hx)/2+wx*9,(p.Ay+fg.Hy)/2+wy*9,'h',13,ORANGE_D,'middle',700);
+        }else{
+          txt(g,p.Ax+14,p.Ay-10,'h = 0',13,dCol,'start',700);
+        }
+        const M=F*fg.h;
+        if(M>60){
+          const a0=Math.atan2(p.By-p.Ay,p.Bx-p.Ax);
+          const da=(fg.tau>=0?1:-1)*(0.45+2.3*Math.min(1,M/4200));
+          g.appendChild(E('path',{d:arcPath(p.Ax,p.Ay,16,a0,da),fill:'none',stroke:dCol,'stroke-width':2}));
+          const ae=a0+da;
+          arrowHead(g,p.Ax+16*Math.cos(ae),p.Ay+16*Math.sin(ae),ae+(da>0?Math.PI/2:-Math.PI/2),5.5,dCol);
+        }else{
+          txt(g,p.Ax-16,p.Ay+16,'M = 0',11,dCol,'end',700);
+        }
+        if(did)txt(g,p.Ax-14,p.Ay+42,'作用线通过回转中心 A',12,dCol,'middle',700);
+      }
+
+      const isDragC=(mode==='rocker');
+      [['B',p.Bx,p.By,cCol],['C',p.Cx,p.Cy,pCol]].forEach(([lab,x,y,col])=>{
+        const c=E('circle',{cx:x,cy:y,r:7,fill:cssv('--surface'),stroke:col,'stroke-width':2});
+        if((lab==='C')===isDragC)c.dataset.pt='DRV';
+        g.appendChild(c);
+        if((lab==='C')===isDragC){
+          const hc=E('circle',{cx:x,cy:y,r:11.5,fill:'none',stroke:FORCEC,'stroke-width':1.2,'stroke-dasharray':'3 2.5'});
+          hc.dataset.pt='DRV'; g.appendChild(hc);
+        }
+      });
+      if(isDragC)pillAt(g,p.Cx,p.Cy,p.Dx,p.Dy,p.Ax,p.Ay);
+      else pillAt(g,p.Ax,p.Ay,p.Bx,p.By,p.Cx,p.Cy);
+      txt(g,p.Bx-13,p.By-11,'B',13,cCol,'middle',600);
+      txt(g,p.Cx+13,p.Cy-11,'C',13,pCol,'middle',600);
+    }
+    [['A',cx,cy],['D',Dx,cy]].forEach(([lab,x,y])=>{
+      g.appendChild(E('circle',{cx:x,cy:y,r:6,fill:'#5f5e5a'}));
+      g.appendChild(E('path',{d:'M'+(x-7)+' '+(y+6)+' L'+(x+7)+' '+(y+6)+' L'+x+' '+(y-1)+' Z',fill:'none',stroke:'#888780','stroke-width':1}));
+      txt(g,x,y+22,lab,13,cssv('--text2'),'middle');
+    });
+    if(did){
+      txt(svg,180,20,'⚠ 检测到死点位置',15,dCol,'middle',700);
+      txt(svg,180,38,performance.now()<toastUntil?'找到了！曲柄与连杆共线。':(showMechanism?'曲柄AB 与连杆BC 共线 · γ = 0 · h = 0 · M = 0':'曲柄AB 与连杆BC 共线 · 传动角 γ = 0'),11.5,dCol,'middle');
+    }else if(near){
+      txt(svg,180,20,'接近死点：曲柄与连杆趋于共线。',13,ORANGE_D,'middle',600);
+    }else if(colPass){
+      txt(svg,180,20,'共线位置 · 曲柄主动可顺利通过',13,FORCEC,'middle',600);
+    }
+  }
+
+  function updatePanel(){
+    const p=fourBar(L,norm(theta),cx,cy);
+    const did=deadId(), px=proxAt(norm(theta));
+    if(p){
+      const gm=did?0:gammaAt(p);
+      const ge=P.querySelector('#d-gam');
+      ge.textContent=Math.round(gm)+'°';
+      ge.style.color=gm<40?'var(--danger)':'';
+    }
+    P.querySelector('#d-fv').textContent=F+'%';
+    if(mode==='rocker'&&p&&showMechanism){
+      const h=did?0:forceGeom(p).h;
+      P.querySelector('#d-h').textContent=h.toFixed(0);
+      P.querySelector('#d-m').textContent=Math.round(F*h);
+    }else{
+      P.querySelector('#d-h').textContent='—';
+      P.querySelector('#d-m').textContent='—';
+    }
+    const v=P.querySelector('#d-verdict'), nm=P.querySelector('#d-status'), ds=P.querySelector('#d-sdesc');
+    nm.style.color='';
+    if(did){nm.textContent='死点位置';nm.style.color='var(--danger)';ds.textContent='曲柄与连杆共线 · γ=0 · 力臂为零 · 无法继续运动';v.style.background='var(--danger-bg)';}
+    else if(mode==='rocker'&&px>0.93){nm.textContent='接近死点';ds.textContent='传动角 γ 与力臂 h 正在减小';v.style.background='var(--warn-bg)';}
+    else if(mode==='crank'&&px>0.985){nm.textContent='共线位置';ds.textContent='曲柄主动，不是输入死点，可继续转动';v.style.background='var(--info-bg)';}
+    else{nm.textContent='正常传动';ds.textContent=mode==='rocker'?'摇杆在两侧极限位置之间摆动':'曲柄连续整周转动';v.style.background='var(--surface2)';}
+    updateMsg(did,px);
+  }
+  function updateMsg(did,px){
+    const box=P.querySelector('#d-msg');
+    let html, bg='var(--surface2)';
+    if(demo.active){
+      html='<b>教师演示</b><br>'+demo.msg; bg='var(--info-bg)';
+    }else if(did){
+      html='<b style="color:var(--danger);">检测到死点位置</b><br>曲柄AB与连杆BC共线<br>γ = 0°';
+      bg='var(--danger-bg)';
+      if(showMechanism){
+        html+='<br>作用线通过曲柄回转中心A · 力臂 h = 0 · 驱动力矩 M<sub>A</sub> = F·h = 0';
+        if(F>=80)html+='<br><b>力已经增大，但机构仍不能转动。问题不在于力太小，而在于力臂为零。</b><br>F↑，h = 0，M<sub>A</sub> = F·h = 0';
+      }
+    }else if(mode==='rocker'&&px>0.93){
+      html='接近死点：曲柄与连杆趋于共线。'; bg='var(--warn-bg)';
+    }else if(mode==='crank'&&px>0.985){
+      html='同一共线位置，曲柄主动时机构可以继续运动。'; bg='var(--info-bg)';
+    }else if(mode==='rocker'){
+      html='拖动摇杆，寻找机构无法继续运动的位置。';
+    }else{
+      html='曲柄AB主动：播放或拖动，观察经过共线位置时机构是否卡住。';
+    }
+    box.innerHTML=html; box.style.background=bg;
+  }
+  function checkTasks(){
+    tasks.t2=visitedR&&visitedC&&crankPass;
+    [['#d-t1','t1'],['#d-t2','t2'],['#d-t3','t3']].forEach(([sel,k])=>{
+      const el=P.querySelector(sel);
+      if(tasks[k]&&!el.classList.contains('done')){el.classList.add('done');el.textContent='● '+el.textContent.slice(2);}
+    });
+    if(tasks.t1)P.querySelector('#d-c2').style.display='block';
+    if(tasks.t2)P.querySelector('#d-c3').style.display='block';
+    if(tasks.t1&&tasks.t2&&tasks.t3)P.querySelector('#d-final').style.display='block';
+  }
+  function reachDead(id){
+    if(id===1)found1=true; else if(id===2)found2=true;
+    toastUntil=performance.now()+2600;
+    if(!demo.active){tasks.t1=true;checkTasks();}
+  }
+  function setPlayBtn(){P.querySelector('#d-play').innerHTML=playing?'⏸ 暂停':'▶ 播放';}
+  function syncModeUI(){
+    P.querySelector('#d-mr').classList.toggle('on',mode==='rocker');
+    P.querySelector('#d-mc').classList.toggle('on',mode==='crank');
+    P.querySelector('#d-fs').disabled=(mode==='crank');
+    P.querySelector('#d-fctrl').style.opacity=mode==='crank'?0.45:1;
+  }
+  function syncMechUI(){
+    P.querySelector('#d-aux').textContent=showMechanism?'隐藏受力机理':'显示受力机理';
+    P.querySelector('#d-fctrl').style.display=showMechanism?'block':'none';
+  }
+  function advance(){
+    const k=demo.active?0.6:1;
+    if(mode==='crank'){
+      theta+=dir*0.02*k;
+      if(proxAt(norm(theta))>0.985&&!demo.active){crankPass=true;checkTasks();}
+    }else{
+      const px=proxAt(norm(theta));
+      const slow=Math.max(0.07,1-0.94*Math.max(0,(px-0.72)/0.28));
+      theta+=dir*0.02*slow*k;
+      if(dir>0&&theta>=hi-0.004){theta=hi;playing=false;setPlayBtn();reachDead(deadHiId);}
+      else if(dir<0&&theta<=lo+0.004){theta=lo;playing=false;setPlayBtn();reachDead(deadLoId);}
+    }
+  }
+  function endDemo(){demo.active=false;demo.phase=-1;P.querySelector('#d-demo').innerHTML='▶ 教师演示';}
+  function startDemo(){
+    mode='rocker';theta=(D1+D2)/2;setArcFromTheta();dir=1;dragGoal=null;
+    F=50;P.querySelector('#d-fs').value=50;
+    found1=found2=false;playing=true;setPlayBtn();
+    showMechanism=false;syncMechUI();
+    demo={active:true,paused:false,phase:0,t:0,msg:'① 摇杆CD主动，机构正常运动。'};
+    syncModeUI();
+    P.querySelector('#d-demo').innerHTML='⏸ 暂停演示';
+  }
+  function demoUpdate(dt){
+    demo.t+=dt;
+    const px=proxAt(norm(theta));
+    switch(demo.phase){
+      case 0:
+        if(px>0.9){demo.phase=1;demo.t=0;demo.msg='② 接近死点：曲柄与连杆趋于共线。';}
+        break;
+      case 1:
+        if(deadId()){demo.phase=2;demo.t=0;
+          showMechanism=true;syncMechUI();
+          demo.msg='③ 到达死点：曲柄AB与连杆BC共线，γ = 0°。<br>作用线通过曲柄回转中心A，力臂 h = 0，驱动力矩 M<sub>A</sub> = F·h = 0。';}
+        break;
+      case 2:
+        if(demo.t>5){demo.phase=3;demo.t=0;demo.msg='④ 增大驱动力 F（50% → 90%），观察驱动力矩是否变化。';}
+        break;
+      case 3:
+        F=Math.min(90,50+demo.t/3*40);P.querySelector('#d-fs').value=Math.round(F);
+        if(demo.t>3.2)demo.msg='⑤ F 增大，但 M<sub>A</sub> 仍为 0 —— 问题不在力太小，而在力臂为零。';
+        if(demo.t>6){demo.phase=4;demo.t=0;mode='crank';theta=norm(theta);dir=1;playing=true;setPlayBtn();syncModeUI();demo.msg='⑥ 切换为曲柄AB主动，再次经过同一共线位置。';}
+        break;
+      case 4:
+        if(demo.t>1.2&&px>0.985){demo.phase=5;demo.t=0;playing=false;setPlayBtn();demo.msg='⑦ 同一共线位置，曲柄主动时机构可以继续运动。';}
+        break;
+      case 5:
+        if(demo.t>4){demo.phase=6;demo.t=0;
+          P.querySelector('#d-c2').style.display='block';
+          P.querySelector('#d-c3').style.display='block';
+          P.querySelector('#d-final').style.display='block';
+          P.querySelector('#d-more').open=true;
+          demo.msg='⑧ 判定死点：既要看构件是否共线，也要看谁是原动件。';}
+        break;
+      case 6:
+        if(demo.t>5.5)endDemo();
+        break;
+    }
+  }
+
+  /* ---------- 事件 ---------- */
+  P.querySelector('#d-mr').addEventListener('click',()=>{
+    if(mode==='rocker')return;
+    if(demo.active)endDemo();
+    mode='rocker';setArcFromTheta();dragGoal=null;visitedR=true;playing=false;setPlayBtn();syncModeUI();
+  });
+  P.querySelector('#d-mc').addEventListener('click',()=>{
+    if(mode==='crank')return;
+    if(demo.active)endDemo();
+    mode='crank';theta=norm(theta);dragGoal=null;visitedC=true;playing=true;setPlayBtn();syncModeUI();checkTasks();
+  });
+  P.querySelector('#d-fs').addEventListener('input',e=>{
+    if(demo.active)endDemo();
+    F=+e.target.value;
+    if(mode==='rocker'&&deadId()){tasks.t3=true;checkTasks();}
+  });
+  P.querySelector('#d-play').addEventListener('click',()=>{
+    if(demo.active)endDemo();
+    dragGoal=null;
+    if(!playing&&mode==='rocker'){const id=deadId();if(id)dir=(Math.abs(theta-lo)<0.021)?1:-1;}
+    playing=!playing;setPlayBtn();
+  });
+  P.querySelector('#d-aux').addEventListener('click',function(){
+    showMechanism=!showMechanism;syncMechUI();
+  });
+  const HINTS=['① 观察曲柄AB与连杆BC的位置关系。','② 继续拖动摇杆，使两构件接近同一直线。','③ 比较两个极限位置是否具有相同特征。'];
+  P.querySelector('#d-hint').addEventListener('click',function(){
+    hintN=Math.min(3,hintN+1);this.textContent='提示 '+hintN+'/3';
+    P.querySelector('#d-hints').innerHTML=HINTS.slice(0,hintN).join('<br>');
+  });
+  P.querySelector('#d-reset').addEventListener('click',()=>{
+    if(demo.active)endDemo();
+    mode='rocker';theta=(D1+D2)/2;setArcFromTheta();dir=-1;dragGoal=null;
+    playing=false;setPlayBtn();F=50;P.querySelector('#d-fs').value=50;
+    found1=found2=false;toastUntil=0;showMechanism=false;syncMechUI();
+    hintN=0;P.querySelector('#d-hint').textContent='提示 0/3';P.querySelector('#d-hints').innerHTML='';
+    visitedR=true;visitedC=false;crankPass=false;tasks={t1:false,t2:false,t3:false};
+    ['#d-t1','#d-t2','#d-t3'].forEach(sel=>{const el=P.querySelector(sel);el.classList.remove('done');el.textContent='○ '+el.textContent.slice(2);});
+    P.querySelector('#d-c2').style.display='none';P.querySelector('#d-c3').style.display='none';P.querySelector('#d-final').style.display='none';
+    syncModeUI();
+  });
+  P.querySelector('#d-demo').addEventListener('click',()=>{
+    if(!demo.active)startDemo();
+    else{demo.paused=!demo.paused;P.querySelector('#d-demo').innerHTML=demo.paused?'▶ 继续演示':'⏸ 暂停演示';}
+  });
+
+  /* ---------- 拖动 ---------- */
+  function pt(evt){
+    const r=svg.getBoundingClientRect();
+    const t=evt.touches?evt.touches[0]:evt;
+    let x=(t.clientX-r.left)/r.width*360, y=(t.clientY-r.top)/r.height*320;
+    const g=svg._fitG;
+    if(g){const tr=g.getAttribute('transform');const m=tr.match(/translate\(([-\d.]+),([-\d.]+)\) scale\(([-\d.]+)\)/);if(m){x=(x-+m[1])/(+m[3]);y=(y-+m[2])/(+m[3]);}}
+    return {x,y};
+  }
+  function down(e){
+    const tg=e.target;
+    if(tg.dataset&&tg.dataset.pt){dragging=true;if(demo.active)endDemo();playing=false;setPlayBtn();e.preventDefault();}
+  }
+  function move(e){
+    if(!dragging)return;e.preventDefault();
+    const q=pt(e);
+    if(mode==='crank'){
+      dragGoal=null;
+      theta=Math.atan2(-(q.y-cy),q.x-cx);
+      if(proxAt(norm(theta))>0.985){crankPass=true;checkTasks();}
+    }else{
+      const Dx=cx+L.d;
+      let phi=Math.max(PHI_LO,Math.min(PHI_HI,Math.atan2(-(q.y-cy),q.x-Dx)));
+      const Cx=Dx+L.c*Math.cos(phi), Cy=cy-L.c*Math.sin(phi);
+      const dx=Cx-cx, dy=Cy-cy, dd=Math.hypot(dx,dy);
+      if(dd>L.a+L.b||dd<Math.abs(L.a-L.b))return;
+      const aa=(L.a*L.a-L.b*L.b+dd*dd)/(2*dd);
+      const hh=Math.sqrt(Math.max(0,L.a*L.a-aa*aa));
+      const bx=cx+aa*dx/dd, by=cy+aa*dy/dd;
+      const s1={x:bx-hh*dy/dd,y:by+hh*dx/dd}, s2={x:bx+hh*dy/dd,y:by-hh*dx/dd};
+      const t1=norm(Math.atan2(-(s1.y-cy),s1.x-cx)), t2=norm(Math.atan2(-(s2.y-cy),s2.x-cx));
+      const inArc=t=>{
+        if(lo===D1)return (t>=D1-0.03&&t<=D2+0.03)?t:null;
+        const tt=t<D1?t+TAU:t;
+        return (tt>=D2-0.03&&tt<=D1+TAU+0.03)?tt:null;
+      };
+      const c1=inArc(t1), c2=inArc(t2);
+      let pick;
+      if(c1!==null&&c2!==null)pick=Math.abs(c1-theta)<=Math.abs(c2-theta)?c1:c2;
+      else if(c1!==null)pick=c1;
+      else if(c2!==null)pick=c2;
+      else return;
+      dragGoal=Math.max(lo,Math.min(hi,pick));
+    }
+  }
+  function up(){dragging=false;}
+  svg.addEventListener('mousedown',down);svg.addEventListener('mousemove',move);window.addEventListener('mouseup',up);
+  svg.addEventListener('touchstart',down,{passive:false});svg.addEventListener('touchmove',move,{passive:false});window.addEventListener('touchend',up);
+
+  /* ---------- 课堂检测 ---------- */
+  const QS=[
+    {q:'曲柄AB与连杆BC共线，曲柄AB为原动件，此时机构一定卡死。',a:false,fb:'共线只是几何条件，还要判断原动件。曲柄主动时可以继续转动。'},
+    {q:'摇杆CD为原动件，曲柄AB与连杆BC尚未共线，此时机构处于死点。',a:false,fb:'原动件条件满足，但构件尚未共线，力臂不为零。'},
+    {q:'机构处于死点时，只要把摇杆驱动力增大到足够大，曲柄就能继续转动。',a:false,fb:'死点处力臂 h 为零，因此无论 F 多大，驱动力矩仍为零。'}
+  ];
+  const QM=document.createElement('div');
+  QM.style.cssText='display:none;position:fixed;inset:0;background:rgba(28,28,24,0.55);z-index:9000;overflow-y:auto;padding:22px 14px;';
+  QM.innerHTML='<div style="max-width:540px;margin:20px auto;background:var(--surface);border-radius:12px;padding:18px;border:0.5px solid var(--border);">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><b style="font-size:16px;">课堂检测 · 判一判</b><button id="dq-close" style="min-height:36px;">返回探究器</button></div>'
+    +'<div id="dq-body"></div></div>';
+  document.body.appendChild(QM);
+  let qi=0, qScore=0;
+  function renderQ(){
+    const body=QM.querySelector('#dq-body');
+    if(qi>=QS.length){
+      let fb;
+      if(qScore===3)fb='已掌握死点位置的两个条件和力矩机理。';
+      else if(qScore===2)fb='基本掌握，请重点检查原动件条件。';
+      else fb='建议返回探究器，再完成一次原动件切换和驱动力实验。';
+      body.innerHTML='<div style="text-align:center;padding:14px 0 6px;">'
+        +'<div style="font-size:15px;margin-bottom:8px;">本轮正确率</div>'
+        +'<div style="font-size:34px;font-weight:700;color:#185fa5;">'+qScore+' / 3</div>'
+        +'<div style="font-size:13px;color:var(--text2);margin:10px 0 16px;line-height:1.7;">'+fb+'</div>'
+        +'<div class="btnrow" style="justify-content:center;"><button id="dq-re" class="primary">重新检测</button><button id="dq-back">返回探究器</button></div></div>';
+      body.querySelector('#dq-re').addEventListener('click',()=>{qi=0;qScore=0;renderQ();});
+      body.querySelector('#dq-back').addEventListener('click',()=>{QM.style.display='none';});
+      return;
+    }
+    const item=QS[qi];
+    body.innerHTML='<div style="font-size:12px;color:var(--text2);margin-bottom:6px;">第 '+(qi+1)+' / 3 题 · 判断对错</div>'
+      +'<div style="font-size:15px;line-height:1.8;margin-bottom:14px;">'+item.q+'</div>'
+      +'<div class="btnrow" id="dq-opts"><button data-v="1" class="dbtn">✓ 正确</button><button data-v="0" class="dbtn">✗ 错误</button></div>'
+      +'<div id="dq-fb" style="margin-top:12px;font-size:13px;line-height:1.7;"></div>';
+    body.querySelectorAll('#dq-opts button').forEach(b=>b.addEventListener('click',()=>{
+      const ok=(b.dataset.v==='1')===item.a;
+      if(ok)qScore++;
+      const fbEl=body.querySelector('#dq-fb');
+      fbEl.innerHTML='<div style="border-radius:8px;padding:10px 12px;background:'+(ok?'var(--info-bg)':'var(--danger-bg)')+';">'
+        +'<b style="color:'+(ok?'#185fa5':'var(--danger)')+';">'+(ok?'回答正确':'回答错误')+'</b><br>'+item.fb+'</div>'
+        +'<div class="btnrow" style="justify-content:flex-end;"><button id="dq-next" class="primary">'+(qi===QS.length-1?'查看结果':'下一题')+'</button></div>';
+      body.querySelectorAll('#dq-opts button').forEach(x=>{x.disabled=true;x.style.opacity=0.55;});
+      b.style.opacity=1;b.style.borderColor=ok?'#185fa5':'var(--danger)';b.style.color=ok?'#185fa5':'var(--danger)';b.style.fontWeight='600';
+      fbEl.querySelector('#dq-next').addEventListener('click',()=>{qi++;renderQ();});
+    }));
+  }
+  P.querySelector('#d-quiz').addEventListener('click',()=>{if(demo.active)endDemo();qi=0;qScore=0;renderQ();QM.style.display='block';});
+  QM.querySelector('#dq-close').addEventListener('click',()=>{QM.style.display='none';});
+
+  /* ---------- 主循环 ---------- */
+  function step(){
+    if(activeTab==='dead'){
+      const now=performance.now(), dt=Math.min(0.05,(now-lastT)/1000); lastT=now;
+      if(demo.active&&!demo.paused)demoUpdate(dt);
+      if(playing&&!dragging&&!(demo.active&&demo.paused))advance();
+      if(dragGoal!==null){
+        const was=deadId();
+        const ddg=dragGoal-theta;
+        if(Math.abs(ddg)<0.012)theta=dragGoal;
+        else theta+=Math.max(-0.045,Math.min(0.045,ddg));
+        if(theta===dragGoal)dragGoal=null;
+        if(Math.abs(theta-lo)<0.021)theta=lo;
+        if(Math.abs(theta-hi)<0.021)theta=hi;
+        const nid=deadId();
+        if(nid&&!was)reachDead(nid);
+      }
+      draw();updatePanel();
+    }else{lastT=performance.now();}
+    requestAnimationFrame(step);
+  }
+
+  theta=(D1+D2)/2; setArcFromTheta(); dir=-1;
+  computeView(); syncModeUI(); syncMechUI();
+  MOD.dead={onShow:()=>{draw();updatePanel();}};
+  step();
+})();
+
+(function(){
+  const P=document.getElementById('panel-coupler');
+  P.innerHTML=`
+  <div class="stage-card"><svg id="c-svg" viewBox="0 0 360 300" role="img"><title>连杆曲线仿真</title></svg></div>
+  <div id="c-note" style="background:var(--surface2);border-radius:8px;padding:9px 12px;margin-bottom:12px;font-size:12px;color:var(--text2);line-height:1.6;">连杆上一点 P 的运动轨迹叫连杆曲线（耦合曲线）。改变 P 的位置，轨迹形状随之变化——缝纫机、搅拌机正是靠选取合适的 P 点得到所需轨迹。</div>
+  <div class="ctrl"><div class="head"><span>P 点沿连杆位置</span><span class="val" id="c-pos-v">50%</span></div><input type="range" id="c-pos" min="0" max="100" step="1" value="50"></div>
+  <div class="ctrl"><div class="head"><span>P 点偏移连杆距离</span><span class="val" id="c-off-v">0</span></div><input type="range" id="c-off" min="-60" max="60" step="1" value="30"></div>
+  <div class="ctrl" data-k="a"><div class="head"><span><b style="color:var(--crank)">曲柄AB</b></span><span class="val">—</span></div><input type="range" min="35" max="110" step="1" value="50"></div>
+  <div class="ctrl" data-k="b"><div class="head"><span><b style="color:var(--coupler)">连杆BC</b></span><span class="val">—</span></div><input type="range" min="80" max="190" step="1" value="120"></div>
+  <div class="ctrl" data-k="c"><div class="head"><span><b style="color:var(--rocker)">摇杆CD</b></span><span class="val">—</span></div><input type="range" min="60" max="190" step="1" value="120"></div>
+  <div class="ctrl" data-k="d"><div class="head"><span><b style="color:var(--frame)">机架DA</b></span><span class="val">—</span></div><input type="range" min="80" max="190" step="1" value="130"></div>
+  <div class="btnrow">
+    <button id="c-play" class="primary">⏸ 暂停</button>
+    <span class="seg">预设</span>
+    <button class="c-preset" data-p="50,120,120,130" data-pos="50" data-off="40">花瓣形</button>
+    <button class="c-preset" data-p="45,130,90,120" data-pos="70" data-off="0">D字形</button>
+  </div>
+  <p class="hint">紫色曲线是 P 点轨迹。拖动上面两个滑块改变 P 在连杆上的位置和偏移，观察轨迹从椭圆、花瓣到 8 字等形状的变化。</p>`;
+
+  const svg=document.getElementById('c-svg');
+  const cx=120, cy=150;
+  let L={a:50,b:120,c:120,d:130};
+  let theta=0, playing=true, posR=0.5, offD=30;
+  let rng={fullRot:true,lo:0,hi:2*Math.PI}, curve=[];
+  let view={s:1,ax:180,ay:150};
+
+  function rebuild(){
+    rng=rangeOf(L,cx,cy);
+    curve=[];
+    const N=240;
+    for(let i=0;i<=N;i++){
+      let th;
+      if(rng.fullRot)th=i/N*2*Math.PI;
+      else th=rng.lo+(i/N)*(rng.hi-rng.lo);
+      const p=fourBar(L,th,cx,cy);
+      if(!p){curve.push(null);continue;}
+      curve.push(pPoint(p));
+    }
+    view=fitScale(L,cx,cy,360,300,20,curve);
+  }
+  function pPoint(p){
+    const ux=p.Cx-p.Bx, uy=p.Cy-p.By, len=Math.hypot(ux,uy);
+    const nx=-uy/len, ny=ux/len;
+    return {x:p.Bx+ux*posR+nx*offD, y:p.By+uy*posR+ny*offD};
+  }
+  function nearSing(th){const p=fourBar(L,th,cx,cy);if(!p)return true;return p.h2<1;}
+
+  function draw(){
+    while(svg.firstChild)svg.removeChild(svg.firstChild);
+    const Dx=cx+L.d;
+    let pos=fourBar(L,theta,cx,cy);
+    if(!pos){for(let dd=1;dd<=20&&!pos;dd++){let m=fourBar(L,theta-dd*Math.PI/180,cx,cy);let p2=fourBar(L,theta+dd*Math.PI/180,cx,cy);if(m){theta-=dd*Math.PI/180;pos=m;}else if(p2){theta+=dd*Math.PI/180;pos=p2;}}}
+    const g=E('g',{transform:anchoredTransform(view.s,view.ax,view.ay,360,300)});
+    svg.appendChild(g);
+    g.appendChild(E('line',{x1:cx-15,y1:cy,x2:Dx+15,y2:cy,stroke:'#b4b2a9','stroke-width':0.5,'stroke-dasharray':'3 3'}));
+    let d='',started=false;
+    curve.forEach(pt=>{if(!pt){started=false;return;}d+=(started?'L':'M')+pt.x.toFixed(1)+' '+pt.y.toFixed(1)+' ';started=true;});
+    if(rng.fullRot&&d)d+='Z';
+    if(d)g.appendChild(E('path',{d,fill:'none',stroke:'#7f77dd','stroke-width':2}));
+    if(pos){
+      const pp=pPoint(pos);
+      g.appendChild(E('line',{x1:pos.Ax,y1:pos.Ay,x2:pos.Bx,y2:pos.By,stroke:cssv('--crank'),'stroke-width':3.5,'stroke-linecap':'round'}));
+      g.appendChild(E('line',{x1:pos.Bx,y1:pos.By,x2:pos.Cx,y2:pos.Cy,stroke:cssv('--coupler'),'stroke-width':3.5,'stroke-linecap':'round'}));
+      g.appendChild(E('line',{x1:pos.Cx,y1:pos.Cy,x2:pos.Dx,y2:pos.Dy,stroke:cssv('--rocker'),'stroke-width':3.5,'stroke-linecap':'round'}));
+      g.appendChild(E('line',{x1:pos.Bx,y1:pos.By,x2:pp.x,y2:pp.y,stroke:'#7f77dd','stroke-width':1.5,'stroke-dasharray':'3 2'}));
+      g.appendChild(E('line',{x1:pos.Cx,y1:pos.Cy,x2:pp.x,y2:pp.y,stroke:'#7f77dd','stroke-width':1.5,'stroke-dasharray':'3 2'}));
+      [['B',pos.Bx,pos.By,cssv('--crank')],['C',pos.Cx,pos.Cy,cssv('--coupler')]].forEach(([lab,x,y,col])=>{g.appendChild(E('circle',{cx:x,cy:y,r:6,fill:cssv('--surface'),stroke:col,'stroke-width':2}));});
+      g.appendChild(E('circle',{cx:pp.x,cy:pp.y,r:6,fill:'#7f77dd',stroke:cssv('--surface'),'stroke-width':1.5}));
+      txt(g,pp.x+11,pp.y-8,'P',13,'#7f77dd','middle',600);
+    }
+    [['A',cx,cy],['D',Dx,cy]].forEach(([lab,x,y])=>{g.appendChild(E('circle',{cx:x,cy:y,r:5,fill:'#5f5e5a'}));g.appendChild(E('path',{d:`M${x-7} ${y+6} L${x+7} ${y+6} L${x} ${y-1} Z`,fill:'none',stroke:'#888780','stroke-width':1}));txt(g,x,y+22,lab,13,cssv('--text2'),'middle');});
+  }
+  function sync(){P.querySelectorAll('.ctrl[data-k]').forEach(c=>{const k=c.dataset.k;c.querySelector('input').value=L[k];c.querySelector('.val').textContent=Math.round(L[k]);});P.querySelector('#c-pos').value=Math.round(posR*100);P.querySelector('#c-pos-v').textContent=Math.round(posR*100)+'%';P.querySelector('#c-off').value=offD;P.querySelector('#c-off-v').textContent=offD;}
+
+  let dir=1;
+  function step(){
+    if(activeTab==='coupler'&&playing){
+      let spd=0.02;
+      if(rng.fullRot){let nt=theta+dir*spd;if(nearSing(nt)){dir=-dir;nt=theta+dir*spd;}theta=nt;if(theta>2*Math.PI)theta-=2*Math.PI;if(theta<0)theta+=2*Math.PI;}
+      else if(rng.hi>rng.lo){let nt=theta+dir*spd;if(nt>=rng.hi||nt<=rng.lo||nearSing(nt)){dir=-dir;nt=theta+dir*spd;}theta=Math.max(rng.lo,Math.min(rng.hi,nt));}
+    }
+    if(activeTab==='coupler')draw();
+    requestAnimationFrame(step);
+  }
+
+  P.querySelectorAll('.ctrl[data-k] input').forEach(inp=>inp.addEventListener('input',e=>{const k=e.target.closest('.ctrl').dataset.k;L[k]=+e.target.value;e.target.closest('.ctrl').querySelector('.val').textContent=Math.round(L[k]);rebuild();}));
+  P.querySelector('#c-pos').addEventListener('input',e=>{posR=+e.target.value/100;P.querySelector('#c-pos-v').textContent=Math.round(posR*100)+'%';rebuild();});
+  P.querySelector('#c-off').addEventListener('input',e=>{offD=+e.target.value;P.querySelector('#c-off-v').textContent=offD;rebuild();});
+  P.querySelectorAll('.c-preset').forEach(b=>b.addEventListener('click',()=>{const p=b.dataset.p.split(',').map(Number);L={a:p[0],b:p[1],c:p[2],d:p[3]};posR=+b.dataset.pos/100;offD=+b.dataset.off;sync();rebuild();}));
+  P.querySelector('#c-play').addEventListener('click',function(){playing=!playing;this.innerHTML=playing?'⏸ 暂停':'▶ 播放';});
+
+  MOD.coupler={onShow:()=>{sync();rebuild();draw();}};
+  sync();rebuild();step();
+})();
+</script>
+</body>
+</html>
